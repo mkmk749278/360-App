@@ -1,6 +1,8 @@
 package com.app360.signals.ui.screens
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,7 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,7 +34,14 @@ fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Performance Stats", color = OnBackground) },
+                title = {
+                    Text(
+                        "Performance",
+                        fontWeight = FontWeight.Bold,
+                        color = OnBackground,
+                        fontSize = 18.sp,
+                    )
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CardBackground),
             )
         },
@@ -50,55 +61,86 @@ fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 stats?.let { s ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = CardBackground),
-                        shape = RoundedCornerShape(12.dp),
-                    ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text(
-                                "Today's Performance",
-                                color = OnSurface, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    // 2×2 metric grid
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            MetricCard(
+                                label = "Win Rate",
+                                value = "${s.winRate.toInt()}%",
+                                valueColor = when {
+                                    s.winRate >= 70 -> ConfidenceHigh
+                                    s.winRate >= 50 -> ConfidenceMed
+                                    else -> ConfidenceLow
+                                },
+                                icon = "🎯",
+                                modifier = Modifier.weight(1f),
                             )
-                            Spacer(Modifier.height(14.dp))
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                StatItem("Win Rate", "${s.winRate.toInt()}%", Teal)
-                                StatItem("Wins", "${s.wins}", Color(0xFF00FF88))
-                                StatItem("Losses", "${s.losses}", Color(0xFFFF4488))
-                                StatItem("Total", "${s.total}", OnBackground)
-                            }
-                            Spacer(Modifier.height(12.dp))
-                            HorizontalDivider(color = DividerColor)
-                            Spacer(Modifier.height(12.dp))
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                                StatItem(
-                                    "Avg PnL",
-                                    "${if (s.avgPnl >= 0) "+" else ""}${"%.2f".format(s.avgPnl)}%",
-                                    if (s.avgPnl >= 0) Color(0xFF51CF66) else Color(0xFFFF6B6B),
-                                )
-                            }
+                            MetricCard(
+                                label = "Avg PnL",
+                                value = "${if (s.avgPnl >= 0) "+" else ""}${"%.2f".format(s.avgPnl)}%",
+                                valueColor = if (s.avgPnl >= 0) LongGreen else ShortRed,
+                                icon = if (s.avgPnl >= 0) "📈" else "📉",
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            MetricCard(
+                                label = "Total Signals",
+                                value = "${s.total}",
+                                valueColor = Teal,
+                                icon = "📊",
+                                modifier = Modifier.weight(1f),
+                            )
+                            MetricCard(
+                                label = "W / L",
+                                value = "${s.wins} / ${s.losses}",
+                                valueColor = OnBackground,
+                                icon = "⚔️",
+                                modifier = Modifier.weight(1f),
+                            )
                         }
                     }
 
+                    // Wins vs Losses bar chart
                     if (s.total > 0) {
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(
+                                    width = 1.dp,
+                                    brush = Brush.linearGradient(listOf(GradientStart, GradientEnd)),
+                                    shape = RoundedCornerShape(16.dp),
+                                ),
                             colors = CardDefaults.cardColors(containerColor = CardBackground),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                         ) {
                             Column(Modifier.padding(16.dp)) {
                                 Text(
                                     "Wins vs Losses",
-                                    color = OnSurface, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                                    color = OnSurface,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
                                 )
                                 Spacer(Modifier.height(16.dp))
-                                WinLossBarChart(wins = s.wins, losses = s.losses)
+                                AnimatedWinLossChart(wins = s.wins, losses = s.losses)
                             }
                         }
                     }
                 } ?: run {
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("No stats available yet", color = OnSurface)
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("No stats available yet", color = OnSurface, fontSize = 14.sp)
                     }
                 }
 
@@ -106,10 +148,130 @@ fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
                     onClick = viewModel::loadStats,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Surface),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(12.dp),
                 ) {
-                    Text("Refresh Stats", color = Teal)
+                    Text("Refresh Stats", color = Teal, fontWeight = FontWeight.SemiBold)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun MetricCard(
+    label: String,
+    value: String,
+    valueColor: Color,
+    icon: String,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.border(
+            width = 1.dp,
+            brush = Brush.linearGradient(
+                listOf(GradientStart.copy(alpha = 0.5f), GradientEnd.copy(alpha = 0.5f)),
+            ),
+            shape = RoundedCornerShape(16.dp),
+        ),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(
+            Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.Start,
+        ) {
+            Text(icon, fontSize = 18.sp)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                value,
+                color = valueColor,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 22.sp,
+                fontFamily = FontFamily.Monospace,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(label, color = OnSurfaceDim, fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+fun AnimatedWinLossChart(wins: Int, losses: Int) {
+    val total = (wins + losses).coerceAtLeast(1)
+    val winTargetFraction = wins.toFloat() / total
+    val lossTargetFraction = losses.toFloat() / total
+
+    val winFraction by animateFloatAsState(
+        targetValue = winTargetFraction,
+        animationSpec = tween(1000, easing = FastOutSlowInEasing),
+        label = "win_fraction",
+    )
+    val lossFraction by animateFloatAsState(
+        targetValue = lossTargetFraction,
+        animationSpec = tween(1000, easing = FastOutSlowInEasing),
+        label = "loss_fraction",
+    )
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(140.dp),
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val maxHeight = size.height * 0.70f
+            val barWidth = size.width * 0.25f
+            val cornerRadius = CornerRadius(8f, 8f)
+            val gridLineColor = Color(0xFF1E293B)
+
+            // Horizontal grid lines at 25%, 50%, 75%
+            for (i in 1..3) {
+                val y = size.height - (maxHeight * i / 4) - 20f
+                drawLine(
+                    color = gridLineColor,
+                    start = Offset(0f, y),
+                    end = Offset(size.width, y),
+                    strokeWidth = 0.5f,
+                )
+            }
+
+            // Wins bar
+            val winsHeight = maxHeight * winFraction
+            if (winsHeight > 0) {
+                drawRoundRect(
+                    color = LongGreen,
+                    topLeft = Offset(size.width * 0.15f, size.height - winsHeight - 20f),
+                    size = Size(barWidth, winsHeight),
+                    cornerRadius = cornerRadius,
+                )
+            }
+
+            // Losses bar
+            val lossHeight = maxHeight * lossFraction
+            if (lossHeight > 0) {
+                drawRoundRect(
+                    color = ShortRed,
+                    topLeft = Offset(size.width * 0.60f, size.height - lossHeight - 20f),
+                    size = Size(barWidth, lossHeight),
+                    cornerRadius = cornerRadius,
+                )
+            }
+        }
+
+        // Count labels above bars and axis labels below
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomStart),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("$wins", color = LongGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("Wins", color = OnSurfaceDim, fontSize = 10.sp)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("$losses", color = ShortRed, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("Losses", color = OnSurfaceDim, fontSize = 10.sp)
             }
         }
     }
@@ -125,37 +287,5 @@ fun StatItem(label: String, value: String, valueColor: Color) {
 
 @Composable
 fun WinLossBarChart(wins: Int, losses: Int) {
-    val total = (wins + losses).coerceAtLeast(1)
-    val winFraction = wins.toFloat() / total
-    val lossFraction = losses.toFloat() / total
-
-    Canvas(
-        Modifier
-            .fillMaxWidth()
-            .height(120.dp),
-    ) {
-        val barWidth = size.width / 3f
-        val maxHeight = size.height * 0.85f
-        val winsHeight = maxHeight * winFraction
-        val lossHeight = maxHeight * lossFraction
-        val cornerRadius = CornerRadius(6f, 6f)
-        val gap = size.width / 6f
-
-        drawRoundRect(
-            color = Color(0xFF00D4AA),
-            topLeft = Offset(gap, size.height - winsHeight),
-            size = Size(barWidth, winsHeight),
-            cornerRadius = cornerRadius,
-        )
-        drawRoundRect(
-            color = Color(0xFFFF4488),
-            topLeft = Offset(gap * 2 + barWidth, size.height - lossHeight),
-            size = Size(barWidth, lossHeight),
-            cornerRadius = cornerRadius,
-        )
-    }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-        Text("Wins ($wins)", color = Teal, fontSize = 11.sp)
-        Text("Losses ($losses)", color = ShortRed, fontSize = 11.sp)
-    }
+    AnimatedWinLossChart(wins = wins, losses = losses)
 }

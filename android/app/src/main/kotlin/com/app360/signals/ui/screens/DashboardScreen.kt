@@ -1,6 +1,7 @@
 package com.app360.signals.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
@@ -11,8 +12,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,30 +47,73 @@ fun DashboardScreen(
                 TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("360 Signals", fontWeight = FontWeight.Bold, color = OnBackground)
-                            Spacer(Modifier.width(8.dp))
-                            ConnectionDot(connectionState)
+                            Text(
+                                "360°",
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Teal,
+                                fontSize = 20.sp,
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            PulsingConnectionDot(connectionState)
+                            Spacer(Modifier.width(5.dp))
+                            Text(
+                                when (connectionState) {
+                                    ConnectionState.CONNECTED -> "LIVE"
+                                    ConnectionState.RECONNECTING -> "SYNCING"
+                                    ConnectionState.DISCONNECTED -> "OFFLINE"
+                                },
+                                color = when (connectionState) {
+                                    ConnectionState.CONNECTED -> Teal
+                                    ConnectionState.RECONNECTING -> Gold
+                                    ConnectionState.DISCONNECTED -> ShortRed
+                                },
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                            )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = CardBackground),
                 )
-                AnimatedVisibility(visible = connectionState != ConnectionState.CONNECTED) {
+                AnimatedVisibility(visible = connectionState == ConnectionState.RECONNECTING) {
+                    val pulseTransition = rememberInfiniteTransition(label = "reconnect")
+                    val alpha by pulseTransition.animateFloat(
+                        initialValue = 0.4f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+                        label = "reconnect_alpha",
+                    )
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .background(
-                                if (connectionState == ConnectionState.RECONNECTING)
-                                    Color(0xFF4A3000) else Color(0xFF3A0000)
-                            )
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                            .background(Color(0xFF2A1800))
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            if (connectionState == ConnectionState.RECONNECTING)
-                                "🔄 Reconnecting to live feed…" else "🔴 Disconnected",
-                            color = Color(0xFFFFCC44),
-                            fontSize = 12.sp,
+                        Box(
+                            Modifier
+                                .size(6.dp)
+                                .background(Gold.copy(alpha = alpha), RoundedCornerShape(3.dp)),
                         )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Reconnecting to live feed…", color = Gold, fontSize = 12.sp)
+                    }
+                }
+                AnimatedVisibility(visible = connectionState == ConnectionState.DISCONNECTED) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF2A0010))
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier
+                                .size(6.dp)
+                                .background(ShortRed, RoundedCornerShape(3.dp)),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Disconnected from live feed", color = ShortRed, fontSize = 12.sp)
                     }
                 }
                 LazyRow(
@@ -77,16 +124,10 @@ fun DashboardScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     items(FilterOption.values()) { f ->
-                        FilterChip(
+                        GradientFilterChip(
                             selected = filter == f,
+                            label = f.name,
                             onClick = { viewModel.setFilter(f) },
-                            label = { Text(f.name, fontSize = 11.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Teal,
-                                selectedLabelColor = Color.Black,
-                                containerColor = Surface,
-                                labelColor = OnSurface,
-                            ),
                         )
                     }
                 }
@@ -101,12 +142,33 @@ fun DashboardScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            if (signals.isEmpty()) {
+            if (isRefreshing && signals.isEmpty()) {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(3) { SkeletonCard() }
+                }
+            } else if (signals.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    val emptyTransition = rememberInfiniteTransition(label = "empty")
+                    val emptyScale by emptyTransition.animateFloat(
+                        initialValue = 0.9f,
+                        targetValue = 1.1f,
+                        animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse),
+                        label = "empty_scale",
+                    )
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("📡", fontSize = 48.sp)
+                        Text(
+                            "📡",
+                            fontSize = 48.sp,
+                            modifier = Modifier.scale(emptyScale),
+                        )
                         Spacer(Modifier.height(12.dp))
                         Text("Waiting for signals…", color = OnSurface, fontSize = 14.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Pull down to refresh", color = OnSurfaceDim, fontSize = 12.sp)
                     }
                 }
             } else {
@@ -120,7 +182,13 @@ fun DashboardScreen(
                         LaunchedEffect(signal.effectiveId) { visible = true }
                         AnimatedVisibility(
                             visible = visible,
-                            enter = slideInVertically(initialOffsetY = { -it / 2 }) + fadeIn(),
+                            enter = slideInVertically(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessLow,
+                                ),
+                                initialOffsetY = { it / 3 },
+                            ) + fadeIn(animationSpec = tween(300)),
                         ) {
                             SignalCard(signal = signal, onClick = { onSignalClick(signal) })
                         }
@@ -132,14 +200,46 @@ fun DashboardScreen(
 }
 
 @Composable
+fun GradientFilterChip(selected: Boolean, label: String, onClick: () -> Unit) {
+    val bgModifier = if (selected) {
+        Modifier.background(
+            Brush.linearGradient(listOf(GradientStart, GradientEnd)),
+            RoundedCornerShape(20.dp),
+        )
+    } else {
+        Modifier.background(Surface, RoundedCornerShape(20.dp))
+    }
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .then(bgModifier)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = if (selected) Color.Black else OnSurface,
+            fontSize = 11.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
+    }
+}
+
+@Composable
 fun SignalCard(signal: Signal, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(listOf(GradientStart, GradientEnd)),
+                shape = RoundedCornerShape(16.dp),
+            )
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(0.5.dp, DividerColor),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(
@@ -151,42 +251,40 @@ fun SignalCard(signal: Signal, onClick: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(signal.symbol, fontWeight = FontWeight.Bold, color = OnBackground, fontSize = 16.sp)
+                    Text(
+                        signal.symbol,
+                        fontWeight = FontWeight.Bold,
+                        color = OnBackground,
+                        fontSize = 18.sp,
+                    )
                     DirectionBadge(signal.direction)
                     ChannelPill(signal.channel)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     QualityBadge(signal.qualityTier)
                     Spacer(Modifier.height(2.dp))
-                    Text(timeAgo(signal.timestamp), color = OnSurface, fontSize = 10.sp)
+                    Text(timeAgo(signal.timestamp), color = OnSurfaceDim, fontSize = 10.sp)
                 }
             }
             Spacer(Modifier.height(10.dp))
+            HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
+            Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                PriceItem("Entry", signal.entry)
-                PriceItem("SL", signal.stopLoss, color = Color(0xFFFF6B6B))
-                PriceItem("TP1", signal.tp1, color = Color(0xFF51CF66))
-                if (signal.tp2 > 0) PriceItem("TP2", signal.tp2, color = Color(0xFF69DB7C))
+                PriceItem("ENTRY", signal.entry, OnBackground)
+                PriceItem("SL", signal.stopLoss, ShortRed)
+                PriceItem("TP1", signal.tp1, ConfidenceHigh)
+                if (signal.tp2 > 0) PriceItem("TP2", signal.tp2, ConfidenceHigh.copy(alpha = 0.7f))
             }
             Spacer(Modifier.height(10.dp))
+            HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
+            Spacer(Modifier.height(10.dp))
             ConfidenceBar(signal.confidence)
-            if (signal.riskLabel.isNotBlank()) {
-                Spacer(Modifier.height(4.dp))
+            if (signal.setupClass.isNotBlank() || signal.riskLabel.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (signal.setupClass.isNotBlank()) {
-                        Text(
-                            signal.setupClass, color = OnSurface, fontSize = 10.sp,
-                            modifier = Modifier
-                                .background(Surface, RoundedCornerShape(4.dp))
-                                .padding(horizontal = 4.dp, vertical = 2.dp),
-                        )
-                    }
-                    Text(
-                        signal.riskLabel, color = OnSurface, fontSize = 10.sp,
-                        modifier = Modifier
-                            .background(Surface, RoundedCornerShape(4.dp))
-                            .padding(horizontal = 4.dp, vertical = 2.dp),
-                    )
+                    if (signal.setupClass.isNotBlank()) SmallPill(signal.setupClass)
+                    if (signal.riskLabel.isNotBlank()) SmallPill(signal.riskLabel)
+                    if (signal.rrRatio > 0) SmallPill("1:${"%.1f".format(signal.rrRatio)} RR")
                 }
             }
         }
@@ -194,15 +292,35 @@ fun SignalCard(signal: Signal, onClick: () -> Unit) {
 }
 
 @Composable
-fun DirectionBadge(direction: String) {
-    val isLong = direction.uppercase() == "LONG"
+fun SmallPill(text: String) {
     Box(
         Modifier
-            .background(if (isLong) LongGreenBg else ShortRedBg, RoundedCornerShape(4.dp))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .background(SurfaceVariant, RoundedCornerShape(4.dp))
+            .padding(horizontal = 5.dp, vertical = 2.dp),
+    ) {
+        Text(text, color = OnSurface, fontSize = 9.sp)
+    }
+}
+
+@Composable
+fun DirectionBadge(direction: String) {
+    val isLong = direction.uppercase() == "LONG"
+    val prefix = if (isLong) "▲ " else "▼ "
+    Box(
+        Modifier
+            .shadow(
+                elevation = 4.dp,
+                shape = RoundedCornerShape(6.dp),
+                spotColor = if (isLong) LongGreen else ShortRed,
+            )
+            .background(
+                if (isLong) LongGreenBg else ShortRedBg,
+                RoundedCornerShape(6.dp),
+            )
+            .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
         Text(
-            direction.uppercase(),
+            "$prefix${direction.uppercase()}",
             color = if (isLong) LongGreen else ShortRed,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
@@ -215,7 +333,7 @@ fun ChannelPill(channel: String) {
     val short = channel.removePrefix("360_").take(8)
     Box(
         Modifier
-            .background(Surface, RoundedCornerShape(10.dp))
+            .background(TealDim, RoundedCornerShape(10.dp))
             .padding(horizontal = 6.dp, vertical = 2.dp),
     ) {
         Text(short, color = Teal, fontSize = 9.sp, fontWeight = FontWeight.Medium)
@@ -225,10 +343,10 @@ fun ChannelPill(channel: String) {
 @Composable
 fun QualityBadge(tier: String) {
     val color = when (tier) {
-        "A+" -> Color(0xFF00D4AA)
+        "A+" -> Teal
         "A" -> Color(0xFF51CF66)
-        "B+" -> Color(0xFFFFCC44)
-        else -> Color(0xFF999999)
+        "B+" -> Gold
+        else -> OnSurfaceDim
     }
     Box(
         Modifier
@@ -242,8 +360,20 @@ fun QualityBadge(tier: String) {
 @Composable
 fun PriceItem(label: String, price: Double, color: Color = OnSurface) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, color = OnSurface.copy(alpha = 0.6f), fontSize = 9.sp)
-        Text(formatPrice(price), color = color, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Text(
+            label,
+            color = OnSurfaceDim,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Medium,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            formatPrice(price),
+            color = color,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = FontFamily.Monospace,
+        )
     }
 }
 
@@ -257,23 +387,30 @@ fun ConfidenceBar(confidence: Double) {
     }
     Column {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Confidence", color = OnSurface.copy(alpha = 0.6f), fontSize = 9.sp)
-            Text("${confidence.toInt()}%", color = barColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            Text("Confidence", color = OnSurfaceDim, fontSize = 9.sp)
+            Text(
+                "${confidence.toInt()}%",
+                color = barColor,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+            )
         }
-        Spacer(Modifier.height(3.dp))
+        Spacer(Modifier.height(4.dp))
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(4.dp)
-                .background(Surface, RoundedCornerShape(2.dp)),
+                .height(6.dp)
+                .background(SurfaceVariant, RoundedCornerShape(3.dp)),
         ) {
             Box(
                 Modifier
                     .fillMaxWidth(pct)
-                    .height(4.dp)
+                    .height(6.dp)
                     .background(
-                        Brush.horizontalGradient(listOf(barColor.copy(alpha = 0.6f), barColor)),
-                        RoundedCornerShape(2.dp),
+                        Brush.horizontalGradient(
+                            listOf(ConfidenceHigh.copy(alpha = 0.5f), barColor),
+                        ),
+                        RoundedCornerShape(3.dp),
                     ),
             )
         }
@@ -281,17 +418,99 @@ fun ConfidenceBar(confidence: Double) {
 }
 
 @Composable
-fun ConnectionDot(state: ConnectionState) {
+fun PulsingConnectionDot(state: ConnectionState) {
     val color = when (state) {
-        ConnectionState.CONNECTED -> Color(0xFF00FF88)
-        ConnectionState.RECONNECTING -> Color(0xFFFFCC44)
-        ConnectionState.DISCONNECTED -> Color(0xFFFF4444)
+        ConnectionState.CONNECTED -> LongGreen
+        ConnectionState.RECONNECTING -> Gold
+        ConnectionState.DISCONNECTED -> ShortRed
     }
+    if (state == ConnectionState.CONNECTED) {
+        val dotTransition = rememberInfiniteTransition(label = "dot")
+        val dotScale by dotTransition.animateFloat(
+            initialValue = 0.6f,
+            targetValue = 1.0f,
+            animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse),
+            label = "dot_scale",
+        )
+        Box(
+            Modifier
+                .size(8.dp)
+                .scale(dotScale)
+                .background(color, RoundedCornerShape(4.dp)),
+        )
+    } else {
+        Box(
+            Modifier
+                .size(8.dp)
+                .background(color, RoundedCornerShape(4.dp)),
+        )
+    }
+}
+
+@Composable
+fun SkeletonCard() {
+    val shimmerTransition = rememberInfiniteTransition(label = "shimmer")
+    val shimmer by shimmerTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse),
+        label = "shimmer_alpha",
+    )
     Box(
         Modifier
-            .size(8.dp)
-            .background(color, RoundedCornerShape(4.dp)),
-    )
+            .fillMaxWidth()
+            .background(CardBackground, RoundedCornerShape(16.dp))
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    listOf(
+                        GradientStart.copy(alpha = shimmer * 0.4f),
+                        GradientEnd.copy(alpha = shimmer * 0.4f),
+                    ),
+                ),
+                shape = RoundedCornerShape(16.dp),
+            )
+            .padding(14.dp),
+    ) {
+        Column {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier
+                        .width(120.dp)
+                        .height(18.dp)
+                        .background(OnSurfaceDim.copy(alpha = shimmer), RoundedCornerShape(4.dp)),
+                )
+                Box(
+                    Modifier
+                        .width(40.dp)
+                        .height(18.dp)
+                        .background(OnSurfaceDim.copy(alpha = shimmer * 0.7f), RoundedCornerShape(4.dp)),
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                repeat(4) {
+                    Box(
+                        Modifier
+                            .width(60.dp)
+                            .height(12.dp)
+                            .background(OnSurfaceDim.copy(alpha = shimmer * 0.6f), RoundedCornerShape(4.dp)),
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .background(OnSurfaceDim.copy(alpha = shimmer * 0.4f), RoundedCornerShape(3.dp)),
+            )
+        }
+    }
 }
 
 internal fun formatPrice(price: Double): String = when {

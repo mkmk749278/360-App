@@ -1,21 +1,23 @@
 package com.app360.signals.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.datastore.preferences.core.stringPreferencesKey
 import com.app360.signals.ui.theme.*
 import kotlinx.coroutines.launch
-
-const val DEFAULT_BACKEND_URL = "http://95.111.241.97:8080"
-val BACKEND_URL_KEY = stringPreferencesKey("backend_url")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,7 +35,23 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings", color = OnBackground) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "360°",
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Teal,
+                            fontSize = 22.sp,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Settings",
+                            fontWeight = FontWeight.Normal,
+                            color = OnSurface,
+                            fontSize = 16.sp,
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CardBackground),
             )
         },
@@ -44,21 +62,45 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // Connection card
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(listOf(GradientStart, GradientEnd)),
+                        shape = RoundedCornerShape(16.dp),
+                    ),
                 colors = CardDefaults.cardColors(containerColor = CardBackground),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Backend URL", color = OnSurface, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Link,
+                            contentDescription = null,
+                            tint = Teal,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "Backend URL",
+                            color = OnSurface,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
                     OutlinedTextField(
                         value = urlInput,
                         onValueChange = { urlInput = it; testResult = null },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text(DEFAULT_BACKEND_URL, color = OnSurface.copy(alpha = 0.4f)) },
+                        placeholder = {
+                            Text(DEFAULT_BACKEND_URL, color = OnSurfaceDim, fontSize = 13.sp)
+                        },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Teal,
                             unfocusedBorderColor = DividerColor,
@@ -67,16 +109,33 @@ fun SettingsScreen(
                             cursorColor = Teal,
                         ),
                         singleLine = true,
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                     )
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { onUrlSaved(urlInput.trim().trimEnd('/')) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Teal, contentColor = Color.Black),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f),
-                        ) { Text("Save", fontWeight = FontWeight.Bold) }
+                        // Save — gradient background
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .background(
+                                    Brush.linearGradient(listOf(GradientStart, GradientEnd)),
+                                    RoundedCornerShape(10.dp),
+                                ),
+                        ) {
+                            Button(
+                                onClick = { onUrlSaved(urlInput.trim().trimEnd('/')) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Transparent,
+                                    contentColor = Color.Black,
+                                ),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+                                shape = RoundedCornerShape(10.dp),
+                            ) {
+                                Text("Save", fontWeight = FontWeight.Bold, color = Color.Black)
+                            }
+                        }
+                        // Test connection
                         OutlinedButton(
                             onClick = {
                                 isTesting = true
@@ -89,7 +148,7 @@ fun SettingsScreen(
                             },
                             enabled = !isTesting,
                             border = androidx.compose.foundation.BorderStroke(1.dp, Teal),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.weight(1f),
                         ) {
                             if (isTesting) {
@@ -103,31 +162,90 @@ fun SettingsScreen(
                             }
                         }
                     }
-                    testResult?.let {
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            it,
-                            color = if (it.startsWith("✅")) Color(0xFF00FF88) else Color(0xFFFF4444),
-                            fontSize = 12.sp,
-                        )
+                    testResult?.let { result ->
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (result.startsWith("✅")) LongGreenBg else ShortRedBg,
+                                    RoundedCornerShape(8.dp),
+                                )
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                result,
+                                color = if (result.startsWith("✅")) LongGreen else ShortRed,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
                     }
                 }
             }
 
+            // App info card
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            listOf(GradientStart.copy(alpha = 0.4f), GradientEnd.copy(alpha = 0.4f)),
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                    ),
                 colors = CardDefaults.cardColors(containerColor = CardBackground),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             ) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("App Version", color = OnSurface, fontSize = 13.sp)
-                    Text(appVersion, color = OnBackground, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Column(Modifier.padding(16.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column {
+                            Text(
+                                "360°",
+                                color = Teal,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                            )
+                            Text("Signals", color = OnBackground, fontSize = 14.sp)
+                        }
+                        Box(
+                            Modifier
+                                .background(TealDim, RoundedCornerShape(20.dp))
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                "v$appVersion",
+                                color = Teal,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Backend", color = OnSurfaceDim, fontSize = 12.sp)
+                        Text(
+                            currentUrl
+                                .removePrefix("https://")
+                                .removePrefix("http://"),
+                            color = OnSurface,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
                 }
             }
         }

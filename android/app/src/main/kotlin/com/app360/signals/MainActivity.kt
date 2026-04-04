@@ -4,14 +4,26 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.edit
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,38 +86,26 @@ fun App() {
     var detailSignal by remember { mutableStateOf<Signal?>(null) }
 
     val bottomNavItems = listOf(
-        Triple("Signals", Screen.Dashboard.route, Icons.Default.Wifi),
-        Triple("Stats", Screen.Stats.route, Icons.Default.BarChart),
-        Triple("Settings", Screen.Settings.route, Icons.Default.Settings),
+        Triple("Signals", Screen.Dashboard.route, Icons.Rounded.Wifi),
+        Triple("Stats", Screen.Stats.route, Icons.Rounded.BarChart),
+        Triple("Settings", Screen.Settings.route, Icons.Rounded.Settings),
     )
 
     Scaffold(
         bottomBar = {
-            NavigationBar(containerColor = CardBackground) {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentRoute = navBackStackEntry?.destination?.route
-                bottomNavItems.forEach { (label, route, icon) ->
-                    NavigationBarItem(
-                        selected = currentRoute == route,
-                        onClick = {
-                            navController.navigate(route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(icon, contentDescription = label) },
-                        label = { Text(label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Teal,
-                            selectedTextColor = Teal,
-                            indicatorColor = Surface,
-                            unselectedIconColor = OnSurface,
-                            unselectedTextColor = OnSurface,
-                        ),
-                    )
-                }
-            }
+            val navBackStackEntry by navController.currentBackStackEntryAsState()
+            val currentRoute = navBackStackEntry?.destination?.route
+            AnimatedBottomBar(
+                items = bottomNavItems,
+                selectedRoute = currentRoute,
+                onSelect = { route ->
+                    navController.navigate(route) {
+                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+            )
         },
         containerColor = Background,
     ) { innerPadding ->
@@ -168,6 +168,82 @@ fun App() {
                     SignalDetailScreen(signal = signal, onBack = { navController.popBackStack() })
                 } else {
                     navController.popBackStack()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AnimatedBottomBar(
+    items: List<Triple<String, String, ImageVector>>,
+    selectedRoute: String?,
+    onSelect: (String) -> Unit,
+) {
+    val selectedIndex = items.indexOfFirst { it.second == selectedRoute }.coerceAtLeast(0)
+
+    Column {
+        HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
+        BoxWithConstraints(
+            Modifier
+                .fillMaxWidth()
+                .background(CardBackground),
+        ) {
+            val tabWidth = maxWidth / items.size
+            val indicatorOffset by animateDpAsState(
+                targetValue = tabWidth * selectedIndex + (tabWidth - 48.dp) / 2,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                label = "nav_indicator",
+            )
+
+            Box(Modifier.fillMaxWidth()) {
+                // Sliding teal pill at top
+                Box(
+                    Modifier
+                        .offset(x = indicatorOffset)
+                        .width(48.dp)
+                        .height(2.dp)
+                        .background(
+                            Teal,
+                            RoundedCornerShape(
+                                topStart = 0.dp,
+                                topEnd = 0.dp,
+                                bottomStart = 2.dp,
+                                bottomEnd = 2.dp,
+                            ),
+                        ),
+                )
+
+                // Tab row
+                Row(Modifier.fillMaxWidth()) {
+                    items.forEachIndexed { index, (label, route, icon) ->
+                        val selected = selectedRoute == route
+                        val iconColor by animateColorAsState(
+                            targetValue = if (selected) Teal else OnSurfaceDim,
+                            label = "icon_color_$index",
+                        )
+                        Column(
+                            Modifier
+                                .weight(1f)
+                                .clickable { onSelect(route) }
+                                .padding(vertical = 10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Icon(
+                                icon,
+                                contentDescription = label,
+                                tint = iconColor,
+                                modifier = Modifier.size(24.dp),
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                label,
+                                color = iconColor,
+                                fontSize = 10.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            )
+                        }
+                    }
                 }
             }
         }
