@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# deploy_vps.sh — One-click VPS deployment for 360-Crypto-Scalping V2
+# deploy_vps.sh — One-click VPS deployment for 360-App
 #
 # Deploys the engine via Docker Compose on a fresh or existing VPS.
 # Handles everything: prerequisites, Docker, Redis, .env, build, and start.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/mkmk749278/360-v2/main/deploy_vps.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/mkmk749278/360-App/main/deploy_vps.sh | sudo bash
 #   — OR —
-#   git clone https://github.com/mkmk749278/360-v2.git && cd 360-v2
+#   git clone https://github.com/mkmk749278/360-App.git && cd 360-App
 #   chmod +x deploy_vps.sh
 #   sudo ./deploy_vps.sh
 #
@@ -68,7 +68,7 @@ else
     DEPLOY_HOME="$(getent passwd "$REAL_USER" | cut -d: -f6)"
 fi
 
-hdr "🚀  360-Crypto-Scalping V2 — One-Click VPS Deployment"
+hdr "🚀  360-App — One-Click VPS Deployment"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # PHASE 1 — CLEAN (optional)
@@ -200,14 +200,14 @@ hdr "PHASE 3 — PROJECT FILES"
 
 # If we're not already inside the repo, clone it
 if [ ! -f "docker-compose.yml" ] || [ ! -f "src/main.py" ]; then
-    PROJECT_DIR="$DEPLOY_HOME/360-v2"
+    PROJECT_DIR="$DEPLOY_HOME/360-App"
     if [ -d "$PROJECT_DIR" ]; then
         info "Updating existing clone at $PROJECT_DIR …"
         cd "$PROJECT_DIR"
         git pull --ff-only 2>/dev/null || true
     else
         info "Cloning repository into $PROJECT_DIR …"
-        git clone https://github.com/mkmk749278/360-v2.git "$PROJECT_DIR"
+        git clone https://github.com/mkmk749278/360-App.git "$PROJECT_DIR"
         cd "$PROJECT_DIR"
     fi
     ok "Project files ready at $PROJECT_DIR"

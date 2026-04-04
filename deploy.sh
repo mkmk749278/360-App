@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# 360-Crypto-scalping-V2 — Docker deployment script
+# 360-App — Docker deployment script
 set -euo pipefail
 
-echo "🚀 360-Crypto-scalping-V2 — Docker Deployment"
-echo "==============================================="
+echo "🚀 360-App — Docker Deployment"
+echo "==============================="
 
 # ---------------------------------------------------------------------------
 # Argument parsing
