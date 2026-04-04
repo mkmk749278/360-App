@@ -637,6 +637,27 @@ async def _run() -> None:
         loop.add_signal_handler(sig_name, lambda: asyncio.create_task(engine.shutdown()))
 
     await engine.boot()
+
+    # Start the REST/WebSocket API server in the same event loop
+    from config import API_SERVER_ENABLED, API_SERVER_HOST, API_SERVER_PORT
+    if API_SERVER_ENABLED:
+        try:
+            import uvicorn
+            from src.api_server import app, set_engine
+            set_engine(engine)
+            uvicorn_config = uvicorn.Config(
+                app,
+                host=API_SERVER_HOST,
+                port=API_SERVER_PORT,
+                log_level="warning",
+                loop="none",  # reuse the running asyncio loop
+            )
+            server = uvicorn.Server(uvicorn_config)
+            loop.create_task(server.serve())
+            log.info("API server started on {}:{}", API_SERVER_HOST, API_SERVER_PORT)
+        except Exception as exc:
+            log.error("Failed to start API server: {}", exc)
+
     # Keep running until cancelled
     try:
         await asyncio.Event().wait()

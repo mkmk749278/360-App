@@ -1,0 +1,49 @@
+name: Deploy Backend to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 95.111.241.97
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            APP_DIR="$HOME/360-App"
+
+            # Clone or pull latest
+            if [ -d "$APP_DIR" ]; then
+              cd "$APP_DIR"
+              git fetch origin main
+              git reset --hard origin/main
+            else
+              git clone https://github.com/mkmk749278/360-App.git "$APP_DIR"
+              cd "$APP_DIR"
+            fi
+
+            # Create .env if it doesn't exist
+            if [ ! -f .env ]; then
+              cp .env.example .env
+            fi
+
+            # Build and restart with zero-downtime
+            docker compose pull redis 2>/dev/null || true
+            docker compose build --no-cache engine
+            docker compose up -d
+
+            # Wait and verify health
+            sleep 10
+            docker compose ps
+            curl -sf http://localhost:8080/health && echo "✅ API health check passed" || echo "⚠️ API not yet ready"
+
+            echo "✅ Deployment complete"

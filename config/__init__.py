@@ -1154,3 +1154,11 @@ WS_PRIORITY_DEDICATED_PAIRS: List[str] = [
 SUPPRESSION_TELEMETRY_ENABLED: bool = _safe_bool("SUPPRESSION_TELEMETRY_ENABLED", "true")
 #: Maximum number of suppression events to keep in memory.
 SUPPRESSION_TELEMETRY_MAX_EVENTS: int = _safe_int("SUPPRESSION_TELEMETRY_MAX_EVENTS", "10000")
+
+
+# ---------------------------------------------------------------------------
+# REST API Server (for Android App)
+# ---------------------------------------------------------------------------
+API_SERVER_ENABLED: bool = _safe_bool("API_SERVER_ENABLED", "true")
+API_SERVER_HOST: str = os.getenv("API_SERVER_HOST", "0.0.0.0")
+API_SERVER_PORT: int = _safe_int("API_SERVER_PORT", "8080")

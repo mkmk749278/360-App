@@ -47,3 +47,11 @@ htmlcov/
 *.tar
 docker-compose.override.yml
 data/confidence_log.jsonl
+
+# Android build artifacts
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+*.apk
+*.aab

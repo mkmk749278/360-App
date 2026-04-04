@@ -1,5 +1,6 @@
 package com.app360.signals.data.models
 
+import kotlin.math.abs
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -29,7 +30,7 @@ data class Signal(
 
     val rrRatio: Double
         get() {
-            val risk = Math.abs(entry - stopLoss)
-            return if (risk > 0) Math.abs(tp1 - entry) / risk else 0.0
+            val risk = abs(entry - stopLoss)
+            return if (risk > 0) abs(tp1 - entry) / risk else 0.0
         }
 }

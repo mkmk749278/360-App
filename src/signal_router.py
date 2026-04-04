@@ -134,6 +134,8 @@ class SignalRouter:
         # AI Engine integration (PR: AI Engine Refactor)
         self._ai_predictor: Optional[SignalPredictor] = None
         self._ai_scorer: Optional[AIConfidenceScorer] = None
+        # WebSocket broadcast queues — API server subscribes to these
+        self._ws_broadcast_queues: List[asyncio.Queue] = []
 
     # ------------------------------------------------------------------
     # AI Engine wiring
@@ -615,6 +617,9 @@ class SignalRouter:
         self._position_lock[signal.symbol] = signal.direction
         self._schedule_persist()
 
+        # Broadcast to WebSocket API clients in real-time
+        self._broadcast_signal(signal)
+
         # Track for daily free-channel picks
         self._daily_best.append(signal)
         self._daily_best.sort(key=lambda s: s.confidence, reverse=True)
@@ -912,6 +917,36 @@ class SignalRouter:
     @property
     def active_signals(self) -> Dict[str, Signal]:
         return dict(self._active_signals)
+
+    # ------------------------------------------------------------------
+    # WebSocket broadcast helpers (used by API server)
+    # ------------------------------------------------------------------
+
+    def subscribe_ws(self) -> "asyncio.Queue[Signal]":
+        """Create and register a new WebSocket broadcast queue.
+
+        The API server calls this once per WebSocket connection.  Every new
+        signal that is successfully posted to Telegram will be pushed to all
+        subscribed queues.
+        """
+        q: asyncio.Queue = asyncio.Queue(maxsize=100)
+        self._ws_broadcast_queues.append(q)
+        return q
+
+    def unsubscribe_ws(self, q: "asyncio.Queue") -> None:
+        """Remove a WebSocket broadcast queue (called on disconnect)."""
+        try:
+            self._ws_broadcast_queues.remove(q)
+        except ValueError:
+            pass
+
+    def _broadcast_signal(self, signal: Signal) -> None:
+        """Push *signal* to all subscribed WebSocket queues (best-effort)."""
+        for q in list(self._ws_broadcast_queues):
+            try:
+                q.put_nowait(signal)
+            except asyncio.QueueFull:
+                log.debug("WS broadcast queue full — dropping signal for one client")
 
     def remove_signal(self, signal_id: str) -> None:
         sig = self._active_signals.pop(signal_id, None)
