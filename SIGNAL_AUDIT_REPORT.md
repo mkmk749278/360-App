@@ -26,7 +26,7 @@
 
 ### System Overview
 
-The 360-v2 signal engine processes ~50 USDT-M futures pairs through a 10+ gate pipeline (SMC detection → indicator computation → regime classification → channel evaluation → confidence scoring → correlation gating → session filtering → Telegram dispatch). Each signal passes through 5 independent channels (SCALP, FVG, CVD, VWAP, OBI) with 8-component confidence scoring.
+The 360-App signal engine processes ~50 USDT-M futures pairs through a 10+ gate pipeline (SMC detection → indicator computation → regime classification → channel evaluation → confidence scoring → correlation gating → session filtering → Telegram dispatch). Each signal passes through 5 independent channels (SCALP, FVG, CVD, VWAP, OBI) with 8-component confidence scoring.
 
 ### Critical Findings
 
