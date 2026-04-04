@@ -95,7 +95,7 @@ fun SignalDetailScreen(signal: Signal, onBack: () -> Unit) {
                         QualityBadge(signal.qualityTier)
                     }
                 }
-                if (signal.rrRatio > 0) {
+                if (signal.rrRatio > 0 && signal.tp1 > 0 && signal.stopLoss > 0) {
                     Spacer(Modifier.height(12.dp))
                     HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
                     Spacer(Modifier.height(10.dp))
