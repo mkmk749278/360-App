@@ -1,0 +1,25 @@
+package com.app360.signals.data.api
+
+import com.app360.signals.data.models.HealthResponse
+import com.app360.signals.data.models.Signal
+import com.app360.signals.data.models.Stats
+import com.app360.signals.data.models.StatusResponse
+import retrofit2.http.GET
+import retrofit2.http.Query
+
+interface ApiService {
+    @GET("signals/active")
+    suspend fun getActiveSignals(): List<Signal>
+
+    @GET("signals/history")
+    suspend fun getSignalHistory(@Query("limit") limit: Int = 50): List<Signal>
+
+    @GET("stats")
+    suspend fun getStats(): Stats
+
+    @GET("health")
+    suspend fun getHealth(): HealthResponse
+
+    @GET("status")
+    suspend fun getStatus(): StatusResponse
+}
