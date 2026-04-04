@@ -650,3 +650,31 @@ python -m pytest tests/ -x --ignore=tests/test_deployment.py -q
 ## License
 
 This project does not currently include a license file. All rights are reserved by the repository owner. Contact the maintainer for usage permissions.
+---
+
+## 📱 Android App
+
+The 360 Signals Android app connects to the backend REST API at `http://95.111.241.97:8080`.
+
+### Installing the App
+1. Go to **Actions** tab → latest successful **"Build Android APK"** run
+2. Download the artifact `360-signals-debug-{build_number}.zip`
+3. Extract and install `app-debug.apk` on your Android device
+4. Enable "Install from Unknown Sources" in Android settings
+5. Open the app — it auto-connects to the backend
+
+### GitHub Secrets Required for Deployment
+| Secret | Description |
+|--------|-------------|
+| `VPS_USER` | SSH username on the VPS (e.g. `root`) |
+| `VPS_SSH_KEY` | Private SSH key for VPS `95.111.241.97` |
+
+### API Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check |
+| GET | `/signals/active` | Active signals |
+| GET | `/signals/history` | Signal history |
+| GET | `/stats` | Performance stats |
+| GET | `/status` | Engine status |
+| WS | `/ws/signals` | Real-time signal feed |

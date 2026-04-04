@@ -27,6 +27,9 @@ USER appuser
 
 # No ports exposed — V2 uses outbound-only connections (Telegram polling + Binance WS/REST)
 
+# Expose REST API port for the Android app
+EXPOSE 8080
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD ["python", "healthcheck.py"]
 

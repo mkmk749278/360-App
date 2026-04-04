@@ -27,6 +27,8 @@ services:
       - redis
     networks:
       - 360scalp-v2-net
+    ports:
+      - "8080:8080"
     volumes:
       - 360scalp-v2-logs:/app/logs
       - 360scalp-v2-data:/app/data

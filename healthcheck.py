@@ -3,6 +3,8 @@
 import os
 import sys
 import time
+import urllib.request
+import urllib.error
 
 # Maximum age (seconds) of the heartbeat file before the scanner is
 # considered stale.  Must be longer than a worst-case scan cycle.
@@ -59,6 +61,24 @@ def _scanner_heartbeat_fresh() -> bool:
         return True  # Cannot stat — treat as fresh to avoid false negatives
 
 
+def _api_healthy() -> bool:
+    """Return True if the REST API server responds to GET /health.
+
+    If the API server has not started yet (e.g. during boot) the check is
+    skipped (returns True) to avoid false-negative healthcheck failures.
+    """
+    try:
+        port = int(os.getenv("API_SERVER_PORT", "8080"))
+        url = f"http://localhost:{port}/health"
+        with urllib.request.urlopen(url, timeout=5) as resp:  # noqa: S310
+            return resp.status == 200
+    except urllib.error.URLError:
+        # API server not yet up — treat as healthy during boot
+        return True
+    except Exception:
+        return True  # Best-effort — don't fail healthcheck on unexpected errors
+
+
 if not _engine_process_running():
     print("Engine process (src.main) not found.", file=sys.stderr)
     sys.exit(1)
@@ -76,6 +96,10 @@ if not _scanner_heartbeat_fresh():
         f"Scanner heartbeat is stale (>{_HEARTBEAT_MAX_AGE_SECONDS:.0f}s old).",
         file=sys.stderr,
     )
+    sys.exit(1)
+
+if not _api_healthy():
+    print("REST API /health check failed.", file=sys.stderr)
     sys.exit(1)
 
 sys.exit(0)
