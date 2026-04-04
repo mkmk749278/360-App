@@ -1,0 +1,421 @@
+"""Risk Management Module.
+
+Provides :class:`RiskManager` for position sizing, risk labelling, and
+concurrent-signal validation.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
+
+from src.utils import get_logger
+
+log = get_logger("risk")
+
+# Order book imbalance filter (imported here to avoid circular imports)
+from src.order_book import check_order_book_execution  # noqa: E402
+
+# Minimum required 24h volume (USD) to be considered adequately liquid
+_MIN_VOLUME_LOW_RISK: float = 50_000_000    # > $50M  → Low risk
+_MIN_VOLUME_MED_RISK: float = 10_000_000    # > $10M  → Medium risk
+
+# ATR-to-price ratio thresholds (higher ATR = higher volatility risk)
+_ATR_HIGH_RISK_PCT: float = 0.5    # ATR > 0.5 % of price → High
+_ATR_VERY_HIGH_RISK_PCT: float = 1.0  # ATR > 1.0 % → Very High
+
+# Default account risk per trade (percentage)
+_DEFAULT_ACCOUNT_RISK_PCT: float = 1.0
+
+# Max concurrent signals per symbol in the same direction
+_MAX_CONCURRENT_SAME_DIRECTION: int = 1
+_MAX_CONCURRENT_PER_SYMBOL: int = 2
+
+# Minimum acceptable Risk:Reward ratio — trades below this floor are hard-rejected
+_MIN_RR_FLOOR: float = 1.3
+
+
+@dataclass
+class RiskAssessment:
+    """Output of a risk calculation."""
+
+    risk_label: str          # "Low" | "Medium" | "High" | "Very High"
+    position_size_pct: float  # recommended position size as % of account
+    risk_reward: float        # TP1 / SL distance ratio
+    allowed: bool             # False if concurrent-signal limits exceeded
+    reason: str = ""
+
+
+class RiskManager:
+    """Calculates risk, position sizing, and validates concurrent-signal limits."""
+
+    def __init__(
+        self,
+        account_risk_pct: float = _DEFAULT_ACCOUNT_RISK_PCT,
+        max_concurrent_same_direction: int = _MAX_CONCURRENT_SAME_DIRECTION,
+        max_concurrent_per_symbol: int = _MAX_CONCURRENT_PER_SYMBOL,
+    ) -> None:
+        self.account_risk_pct = account_risk_pct
+        self.max_concurrent_same_direction = max_concurrent_same_direction
+        self.max_concurrent_per_symbol = max_concurrent_per_symbol
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def calculate_risk(
+        self,
+        signal: Any,
+        indicators: Dict[str, Any],
+        volume_24h_usd: float,
+        active_signals: Optional[Dict[str, Any]] = None,
+    ) -> RiskAssessment:
+        """Evaluate risk for *signal* and return a :class:`RiskAssessment`.
+
+        Parameters
+        ----------
+        signal:
+            A :class:`src.channels.base.Signal` instance.
+        indicators:
+            Pre-computed indicator dict for the signal's primary timeframe.
+        volume_24h_usd:
+            24-hour USD volume for the symbol.
+        active_signals:
+            Current active signals dict (signal_id → Signal) for concurrent
+            limit checking.  Pass ``None`` or an empty dict to skip.
+        """
+        entry: float = float(getattr(signal, "entry", 0.0))
+        sl: float = float(getattr(signal, "stop_loss", entry))
+        tp1: float = float(getattr(signal, "tp1", entry))
+        direction_val: str = getattr(getattr(signal, "direction", None), "value", "LONG")
+        symbol: str = getattr(signal, "symbol", "")
+
+        # Risk-reward ratio
+        sl_dist = abs(entry - sl)
+        tp_dist = abs(tp1 - entry)
+        rr = (tp_dist / sl_dist) if sl_dist > 0 else 0.0
+
+        # Position sizing
+        position_size_pct = self._position_size(entry, sl)
+
+        # Spread-based position size penalty: high-spread pairs reduce position
+        # more aggressively than the risk-label adjustment alone.
+        spread_pct: float = float(getattr(signal, "spread_pct", 0.0))
+        if spread_pct > 0.02:
+            # Each 0.01 above the 0.02 baseline costs ~5 % of position size,
+            # floored at 50 % to keep minimum exposure meaningful.
+            spread_factor = max(0.5, 1.0 - (spread_pct - 0.02) * 5)
+            position_size_pct = round(position_size_pct * spread_factor, 2)
+
+        # Risk label
+        atr_val: Optional[float] = indicators.get("atr_last")
+        risk_label = self._classify_risk(entry, atr_val, volume_24h_usd, signal)
+
+        # Concurrent-signal validation
+        allowed, reason = self._validate_concurrent(
+            symbol, direction_val, active_signals or {}
+        )
+
+        # R:R floor — hard-reject trades with insufficient reward-to-risk.
+        # Scalping with an inverted R:R is a guaranteed path to account bleed.
+        if rr < _MIN_RR_FLOOR:
+            allowed = False
+            reason = f"Insufficient R:R ({rr:.2f} < {_MIN_RR_FLOOR})"
+
+        # Order book imbalance check — final execution gate.
+        # Reads the order book snapshot from the signal (attached by the
+        # scanner).  Fails open when data is unavailable.
+        if allowed:
+            ob_data = getattr(signal, "order_book", None)
+            ob_allowed, ob_reason = check_order_book_execution(direction_val, ob_data)
+            if not ob_allowed:
+                allowed = False
+                reason = ob_reason
+                log.debug(
+                    "OBI filter blocked {} {}: {}",
+                    symbol, direction_val, ob_reason,
+                )
+
+        return RiskAssessment(
+            risk_label=risk_label,
+            position_size_pct=position_size_pct,
+            risk_reward=round(rr, 2),
+            allowed=allowed,
+            reason=reason,
+        )
+
+    # ------------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------------
+
+    def _position_size(self, entry: float, stop_loss: float) -> float:
+        """Calculate position size as % of account using fixed-risk formula.
+
+        position_size % = account_risk_pct / (|entry - sl| / entry * 100)
+        """
+        if entry == 0 or stop_loss == 0:
+            return self.account_risk_pct
+        sl_pct = abs(entry - stop_loss) / entry * 100.0
+        if sl_pct == 0:
+            return self.account_risk_pct
+        return round(min(self.account_risk_pct / sl_pct * 100.0, 100.0), 2)
+
+    @staticmethod
+    def _classify_risk(
+        entry: float,
+        atr_val: Optional[float],
+        volume_24h_usd: float,
+        signal: Any,
+    ) -> str:
+        """Assign a risk label based on ATR, volume and spread."""
+        spread_pct: float = float(getattr(signal, "spread_pct", 0.0))
+        confidence: float = float(getattr(signal, "confidence", 50.0))
+
+        # ATR-based volatility
+        atr_pct = (atr_val / entry * 100.0) if (atr_val and entry > 0) else 0.0
+
+        score = 0
+        if atr_pct >= _ATR_VERY_HIGH_RISK_PCT:
+            score += 3
+        elif atr_pct >= _ATR_HIGH_RISK_PCT:
+            score += 2
+        elif atr_pct > 0:
+            score += 1
+
+        if volume_24h_usd < _MIN_VOLUME_MED_RISK:
+            score += 2
+        elif volume_24h_usd < _MIN_VOLUME_LOW_RISK:
+            score += 1
+
+        if spread_pct > 0.02:
+            score += 1
+        if confidence < 60:
+            score += 1
+
+        if score >= 5:
+            return "Very High"
+        if score >= 3:
+            return "High"
+        if score >= 2:
+            return "Medium"
+        return "Low"
+
+    def _validate_concurrent(
+        self,
+        symbol: str,
+        direction: str,
+        active_signals: Dict[str, Any],
+    ) -> tuple[bool, str]:
+        """Return (allowed, reason) after checking concurrent-signal limits."""
+        same_dir = 0
+        same_sym = 0
+        for sig in active_signals.values():
+            if getattr(sig, "symbol", "") == symbol:
+                same_sym += 1
+                if getattr(getattr(sig, "direction", None), "value", "") == direction:
+                    same_dir += 1
+
+        if same_sym >= self.max_concurrent_per_symbol:
+            return False, f"Max {self.max_concurrent_per_symbol} concurrent signals per symbol exceeded"
+        if same_dir >= self.max_concurrent_same_direction:
+            return False, f"Max {self.max_concurrent_same_direction} concurrent {direction} signals for {symbol}"
+        return True, ""
+
+
+# ---------------------------------------------------------------------------
+# Module-level helpers
+# ---------------------------------------------------------------------------
+
+
+def calculate_position_size(
+    confidence: float,
+    atr: float,
+    account_risk_pct: float = 1.0,
+    entry: float = 0.0,
+) -> float:
+    """Compute a recommended position size (% of account) from confidence and ATR.
+
+    The base size is ``account_risk_pct``.  It is scaled linearly with
+    confidence (50-100 range) and inversely with ATR volatility so that
+    high-confidence, low-volatility setups receive larger allocations.
+
+    Parameters
+    ----------
+    confidence:
+        Signal confidence score (0-100).
+    atr:
+        Average True Range value.
+    account_risk_pct:
+        Base account risk per trade (default 1.0%).
+    entry:
+        Entry price.  When provided and > 0, ATR is expressed as a %
+        of entry for normalisation.
+
+    Returns
+    -------
+    Recommended position size as a percentage of account equity.
+    """
+    if confidence <= 0:
+        return 0.0
+
+    # Normalise confidence to a 0-1 multiplier (0 → 0.0, 100 → 1.0)
+    # e.g. confidence=50 → 0.5, confidence=80 → 0.8, confidence=100 → 1.0
+    conf_mult = max(0.0, min(confidence / 100.0, 1.0))
+
+    # Normalise ATR volatility: high ATR → smaller position
+    atr_pct = (atr / entry * 100.0) if (atr > 0 and entry > 0) else atr
+    # Scale: 0% ATR → mult=1.5, 1% ATR → mult=1.0, 2%+ ATR → mult=0.5
+    atr_mult = max(0.5, 1.5 - atr_pct * 0.5)
+
+    size = account_risk_pct * conf_mult * atr_mult
+    return round(min(size, 100.0), 2)
+
+
+# ---------------------------------------------------------------------------
+# Kelly Criterion & drawdown-adaptive sizing
+# ---------------------------------------------------------------------------
+
+
+def kelly_criterion(
+    win_rate: float,
+    avg_win: float,
+    avg_loss: float,
+    fraction: float = 0.25,
+) -> float:
+    """Compute fractional Kelly position sizing.
+
+    Full Kelly:  f* = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
+    Fractional Kelly multiplies by *fraction* (default 0.25 = quarter-Kelly).
+
+    Parameters
+    ----------
+    win_rate:
+        Historical win rate (0-1).
+    avg_win:
+        Average winning trade return (positive).
+    avg_loss:
+        Average losing trade return (positive magnitude).
+    fraction:
+        Kelly fraction to apply (0-1).  Lower is safer.
+
+    Returns
+    -------
+    float
+        Fraction of capital to risk, clamped to ``[0.01, 0.10]``.
+    """
+    if avg_win <= 0:
+        return 0.01
+    full_kelly = (win_rate * avg_win - (1.0 - win_rate) * avg_loss) / avg_win
+    fractional = full_kelly * fraction
+    return round(max(0.01, min(0.10, fractional)), 4)
+
+
+class DrawdownAdaptiveSizer:
+    """Reduces position size as drawdown deepens.
+
+    Parameters
+    ----------
+    base_size_pct:
+        Full position size when equity is at its peak (% of capital).
+    max_drawdown_reduction:
+        Maximum fractional reduction at the 5 % drawdown level (e.g. 0.5 = 50 %).
+    """
+
+    def __init__(
+        self,
+        base_size_pct: float = 2.0,
+        max_drawdown_reduction: float = 0.5,
+    ) -> None:
+        self.base_size_pct = base_size_pct
+        self.max_drawdown_reduction = max_drawdown_reduction
+        self._peak_equity: float = 100.0
+        self._current_equity: float = 100.0
+
+    def update_pnl(self, pnl_pct: float) -> None:
+        """Record a trade PnL result (as % of equity).
+
+        Parameters
+        ----------
+        pnl_pct:
+            Percentage gain/loss (e.g. +1.5 or -0.8).
+        """
+        self._current_equity *= (1.0 + pnl_pct / 100.0)
+        if self._current_equity > self._peak_equity:
+            self._peak_equity = self._current_equity
+
+    def get_position_size_pct(self) -> float:
+        """Return the drawdown-adjusted position size (% of capital).
+
+        - 0 % drawdown → full ``base_size_pct``
+        - 5 % drawdown → reduced by ``max_drawdown_reduction``
+        - 10 %+ drawdown → minimum 25 % of ``base_size_pct``
+        """
+        if self._peak_equity <= 0:
+            return self.base_size_pct * 0.25
+
+        drawdown_pct = (self._peak_equity - self._current_equity) / self._peak_equity * 100.0
+        drawdown_pct = max(0.0, drawdown_pct)
+
+        if drawdown_pct >= 10.0:
+            return round(self.base_size_pct * 0.25, 4)
+
+        # Linear interpolation: 0 % dd → factor 1.0, 5 % dd → factor (1 - max_reduction)
+        reduction_factor = min(drawdown_pct / 5.0, 1.0) * self.max_drawdown_reduction
+        factor = max(0.25, 1.0 - reduction_factor)
+        return round(self.base_size_pct * factor, 4)
+
+    def reset(self) -> None:
+        """Reset equity tracking to initial state."""
+        self._peak_equity = 100.0
+        self._current_equity = 100.0
+
+
+from typing import List  # noqa: E402
+
+
+def compute_correlation_adjusted_risk(
+    positions: List[dict],
+    new_signal: dict,
+    max_portfolio_risk_pct: float = 5.0,
+) -> dict:
+    """Check whether adding *new_signal* would exceed portfolio risk limits.
+
+    Parameters
+    ----------
+    positions:
+        List of open positions, each a dict with keys
+        ``{"symbol": str, "direction": str, "risk_pct": float}``.
+    new_signal:
+        Proposed new signal dict with the same keys.
+    max_portfolio_risk_pct:
+        Maximum acceptable total portfolio risk (%).
+
+    Returns
+    -------
+    dict
+        ``{"allowed": bool, "adjusted_risk_pct": float,
+          "portfolio_risk_pct": float, "reason": str}``
+    """
+    current_risk = sum(float(p.get("risk_pct", 0.0)) for p in positions)
+    new_risk = float(new_signal.get("risk_pct", 0.0))
+    total_risk = current_risk + new_risk
+
+    if total_risk > max_portfolio_risk_pct:
+        remaining = max(0.0, max_portfolio_risk_pct - current_risk)
+        return {
+            "allowed": remaining > 0,
+            "adjusted_risk_pct": round(remaining, 4),
+            "portfolio_risk_pct": round(current_risk, 4),
+            "reason": (
+                f"Portfolio risk would be {total_risk:.2f}% "
+                f"(max {max_portfolio_risk_pct}%). "
+                + ("Reduced to fit." if remaining > 0 else "No room.")
+            ),
+        }
+
+    return {
+        "allowed": True,
+        "adjusted_risk_pct": round(new_risk, 4),
+        "portfolio_risk_pct": round(current_risk, 4),
+        "reason": "",
+    }
