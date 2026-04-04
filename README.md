@@ -178,7 +178,7 @@ Binance WS ──► WebSocketManager (multi-conn, heartbeat, auto-reconnect)
 Deploy on a fresh Ubuntu VPS (20.04 / 22.04 / 24.04) with a single command:
 
 ```bash
-git clone https://github.com/mkmk749278/360-v2.git && cd 360-v2
+git clone https://github.com/mkmk749278/360-App.git && cd 360-App
 cp .env.example .env
 nano .env              # Fill in your Telegram credentials
 sudo bash deploy_vps.sh
@@ -200,7 +200,7 @@ That's it. The script installs Docker, builds the image, and starts Redis + Engi
 Requires Docker and Docker Compose already installed:
 
 ```bash
-git clone https://github.com/mkmk749278/360-v2.git && cd 360-v2
+git clone https://github.com/mkmk749278/360-App.git && cd 360-App
 cp .env.example .env
 nano .env
 docker compose build
@@ -210,7 +210,7 @@ docker compose up -d
 ### Option C — Bare-Metal (Development)
 
 ```bash
-git clone https://github.com/mkmk749278/360-v2.git && cd 360-v2
+git clone https://github.com/mkmk749278/360-App.git && cd 360-App
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env && nano .env
@@ -326,7 +326,7 @@ docker compose logs --tail=100 engine
 ### Updating to Latest Code
 
 ```bash
-cd 360-v2
+cd 360-App
 git pull
 docker compose up -d --build
 ```
@@ -449,7 +449,7 @@ Signals are updated in real time as targets are hit:
 ## Project Structure
 
 ```
-360-v2/
+360-App/
 ├── config/
 │   └── __init__.py                # Centralized settings, constants, defaults
 ├── src/
@@ -617,7 +617,7 @@ sudo bash deploy_vps.sh --clean    # Removes all containers, images, Redis data
 ### Development Setup
 
 ```bash
-git clone https://github.com/mkmk749278/360-v2.git && cd 360-v2
+git clone https://github.com/mkmk749278/360-App.git && cd 360-App
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
