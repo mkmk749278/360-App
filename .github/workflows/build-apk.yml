@@ -25,6 +25,16 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
 
+      - name: Set up debug keystore for consistent signing
+        run: |
+          mkdir -p android/app
+          if [ ! -f android/app/debug.keystore ]; then
+            keytool -genkey -v -keystore android/app/debug.keystore \
+              -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
       - name: Cache Gradle packages
         uses: actions/cache@v4
         with:
@@ -52,3 +62,15 @@ jobs:
         with:
           files: android/app/build/outputs/apk/debug/app-debug.apk
           name: "360 Signals ${{ github.ref_name }}"
+
+      - name: APK Summary
+        if: success()
+        run: |
+          APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          APK_SIZE=$(du -sh "$APK_PATH" | cut -f1)
+          echo "## ✅ APK Build Success" >> $GITHUB_STEP_SUMMARY
+          echo "- **Size:** $APK_SIZE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run:** #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📥 Download the APK from the **Artifacts** section above." >> $GITHUB_STEP_SUMMARY

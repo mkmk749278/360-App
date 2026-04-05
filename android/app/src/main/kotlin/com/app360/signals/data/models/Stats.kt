@@ -24,6 +24,7 @@ data class StatusResponse(
     @SerialName("pairs_count") val pairsCount: Int = 0,
     @SerialName("scan_interval") val scanInterval: Int = 0,
     @SerialName("circuit_breaker_tripped") val circuitBreakerTripped: Boolean = false,
+    @SerialName("circuit_breaker_state") val circuitBreakerState: String = "OK",
     @SerialName("circuit_breaker_status") val circuitBreakerStatus: String = "",
     val regime: String = "",
     @SerialName("active_signals_count") val activeSignalsCount: Int = 0,

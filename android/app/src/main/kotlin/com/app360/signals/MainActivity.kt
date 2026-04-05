@@ -77,6 +77,12 @@ fun App() {
         }
     }.collectAsState(initial = DEFAULT_BACKEND_URL)
 
+    val minConfidence by remember {
+        context.dataStore.data.map { prefs ->
+            prefs[MIN_CONFIDENCE_KEY] ?: DEFAULT_MIN_CONFIDENCE
+        }
+    }.collectAsState(initial = DEFAULT_MIN_CONFIDENCE)
+
     val dashboardVm: DashboardViewModel = hiltViewModel()
 
     LaunchedEffect(backendUrl) {
@@ -129,11 +135,17 @@ fun App() {
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     currentUrl = backendUrl,
+                    minConfidence = minConfidence,
                     onUrlSaved = { url ->
                         scope.launch {
                             context.dataStore.edit { it[BACKEND_URL_KEY] = url }
                             dashboardVm.disconnect()
                             dashboardVm.connect(url)
+                        }
+                    },
+                    onMinConfidenceSaved = { conf ->
+                        scope.launch {
+                            context.dataStore.edit { it[MIN_CONFIDENCE_KEY] = conf }
                         }
                     },
                     onTestConnection = { url ->

@@ -25,11 +25,13 @@ data class Signal(
     @SerialName("analyst_reason") val analystReason: String = "",
     val timestamp: String = "",
     val status: String = "ACTIVE",
+    @SerialName("rr_ratio") val rrRatioServer: Double = 0.0,
 ) {
     val effectiveId: String get() = id.ifBlank { signalId }
 
     val rrRatio: Double
         get() {
+            if (rrRatioServer > 0) return rrRatioServer
             val risk = abs(entry - stopLoss)
             return if (risk > 0) abs(tp1 - entry) / risk else 0.0
         }

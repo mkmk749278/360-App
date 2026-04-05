@@ -1,5 +1,8 @@
 # 360-Crypto-Scalping V2 — AI-Powered Futures Scalping Engine
 
+[![Build Android APK](https://github.com/mkmk749278/360-App/actions/workflows/build-apk.yml/badge.svg)](https://github.com/mkmk749278/360-App/actions/workflows/build-apk.yml)
+[![Deploy Backend](https://github.com/mkmk749278/360-App/actions/workflows/deploy-backend.yml/badge.svg)](https://github.com/mkmk749278/360-App/actions/workflows/deploy-backend.yml)
+
 A high-performance, fully asynchronous Python engine that scans the **top 50 USDT-M futures pairs** on Binance in real time, detects Smart Money Concepts (SMC) setups, calculates dynamic confidence scores (0–100), and routes signals to a **single Active Trading** Telegram channel.
 
 > **Version:** 2.0.0 &nbsp;|&nbsp; **Python:** ≥ 3.11 &nbsp;|&nbsp; **Tests:** 2,300+ &nbsp;|&nbsp; **Deployment:** Docker Compose (one-click)
@@ -172,6 +175,25 @@ Binance WS ──► WebSocketManager (multi-conn, heartbeat, auto-reconnect)
 ---
 
 ## Installation
+
+### GitHub Secrets Setup (for auto-deploy)
+
+To enable automatic deployment via GitHub Actions, add these secrets to your repository
+(**Settings → Secrets and variables → Actions → New repository secret**):
+
+| Secret | Required | Default | Description |
+|---|---|---|---|
+| `VPS_SSH_KEY` | ✅ Required | — | SSH private key for VPS access |
+| `VPS_HOST` | Optional | `95.111.241.97` | VPS IP address |
+| `VPS_USER` | Optional | `root` | VPS username |
+| `TELEGRAM_BOT_TOKEN` | ✅ Required | — | Bot token from @BotFather |
+| `TELEGRAM_ACTIVE_CHANNEL_ID` | Optional | `ID:-1003711676922` | Active signals channel ID |
+| `TELEGRAM_ADMIN_CHAT_ID` | Optional | `710718010` | Your personal chat ID |
+| `TELEGRAM_FREE_CHANNEL_ID` | Optional | `ID:-1003782844881` | Free channel ID |
+| `OPENAI_API_KEY` | Optional | — | OpenAI key for AI analysis |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Optional | — | Enables FCM push notifications |
+
+Once `VPS_SSH_KEY` is set, every push to `main` automatically deploys the backend to your VPS.
 
 ### Option A — One-Click VPS Deployment (Recommended)
 
