@@ -48,6 +48,14 @@ class SignalQueue:
     def _deserialize(self, raw: str) -> dict:
         return json.loads(raw)
 
+    @staticmethod
+    def _on_alert_done(task: asyncio.Task) -> None:
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            log.error("Signal queue alert delivery failed: %s", exc)
+
     def _record_drop(self, signal: Signal, reason: str) -> None:
         self._dropped_signals += 1
         self._overflow_events += 1
@@ -59,12 +67,13 @@ class SignalQueue:
             self._dropped_signals,
         )
         if self._alert_callback and (self._dropped_signals % 10) == 0:
-            asyncio.create_task(
+            task = asyncio.create_task(
                 self._alert_callback(
                     "⚠️ Signal queue is dropping items "
                     f"({self._dropped_signals} total drops, latest={signal.signal_id})."
                 )
             )
+            task.add_done_callback(self._on_alert_done)
 
     def stats(self) -> dict[str, Any]:
         return {
