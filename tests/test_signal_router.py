@@ -88,15 +88,19 @@ class TestSignalRouter:
 
         # Patch _delivery_sleep (not asyncio.sleep) so re-queue delays don't slow
         # the test without affecting the test's own asyncio.sleep() calls.
-        # BTC will be re-queued twice (retries 0→1, 1→2) then permanently lost.
+        # BTC will be re-queued 4 times (retries 0→1, 1→2, 2→3, 3→4) then permanently lost.
         # Order of send calls: BTC attempt1 (RuntimeError), ETH attempt1 (True),
-        # BTC attempt2/retry1 (RuntimeError), BTC attempt3/retry2 (RuntimeError → permanent loss).
+        # BTC attempt2–5/retry1–4 (RuntimeError → permanent loss).
         async def instant_sleep(_secs):
             pass
 
         monkeypatch.setattr(signal_router_module, "_delivery_sleep", instant_sleep)
 
-        send_results = [RuntimeError("telegram down"), True, RuntimeError("down"), RuntimeError("down")]
+        send_results = [
+            RuntimeError("telegram down"), True,
+            RuntimeError("down"), RuntimeError("down"),
+            RuntimeError("down"), RuntimeError("down"),
+        ]
 
         async def flaky_send(chat_id: str, text: str):
             result = send_results.pop(0)
@@ -545,7 +549,7 @@ class TestSignalRouter:
 
     @pytest.mark.asyncio
     async def test_failed_delivery_permanent_loss_after_max_retries(self, monkeypatch):
-        """Signal is permanently dropped (with log) after 3 failed delivery attempts."""
+        """Signal is permanently dropped (with log) after 5 failed delivery attempts."""
         for channel in ("360_SCALP", "360_SCALP_FVG", "360_SCALP_CVD", "360_SCALP_VWAP", "360_SCALP_OBI"):
             monkeypatch.setitem(signal_router_module.CHANNEL_TELEGRAM_MAP, channel, "premium")
 
@@ -572,7 +576,7 @@ class TestSignalRouter:
         await queue.put(sig)
 
         task = asyncio.create_task(router.start())
-        # Allow sufficient time for all 3 attempts (2 sends + permanent loss on 3rd)
+        # Allow sufficient time for all 5 attempts (4 re-queues + permanent loss on 5th)
         await asyncio.sleep(0.5)
         await router.stop()
         task.cancel()
@@ -581,9 +585,9 @@ class TestSignalRouter:
         except asyncio.CancelledError:
             pass
 
-        # All 3 send attempts completed (2 re-queues + final permanent loss)
-        assert send_call_count[0] == 3
-        assert sig._delivery_retries == 2
+        # All 5 send attempts completed (4 re-queues + final permanent loss)
+        assert send_call_count[0] == 5
+        assert sig._delivery_retries == 4
         assert "TEST-PERMANENT-LOSS" not in router.active_signals
         assert sig.symbol not in router._position_lock
 

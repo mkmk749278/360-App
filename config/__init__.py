@@ -63,21 +63,21 @@ _VALID_LOG_LEVELS = frozenset(
 # ---------------------------------------------------------------------------
 
 def validate_critical_env_vars() -> None:
-    """Emit startup warnings for missing critical env vars.
+    """Emit startup errors for missing critical env vars.
 
     Called during engine boot (not at import time) so that test suites can
     import ``config`` without requiring a full ``.env`` file.
     """
     if not TELEGRAM_BOT_TOKEN:
-        logging.warning(
+        logging.error(
             "⚠️  TELEGRAM_BOT_TOKEN is not set — Telegram alerts will be disabled."
         )
     if not TELEGRAM_ADMIN_CHAT_ID:
-        logging.warning(
+        logging.error(
             "⚠️  TELEGRAM_ADMIN_CHAT_ID is not set — admin commands will be disabled."
         )
     if not TELEGRAM_ACTIVE_CHANNEL_ID:
-        logging.warning(
+        logging.error(
             "⚠️  TELEGRAM_ACTIVE_CHANNEL_ID is not set — signals will not be delivered."
         )
 

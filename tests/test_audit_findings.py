@@ -82,7 +82,7 @@ class TestSafeEnvParsing:
 
 
 class TestEnvVarValidation:
-    """validate_critical_env_vars should emit warnings for missing critical vars."""
+    """validate_critical_env_vars should emit errors for missing critical vars."""
 
     def test_warns_when_telegram_token_empty(self, caplog):
         from config import validate_critical_env_vars

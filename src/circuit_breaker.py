@@ -363,16 +363,28 @@ class CircuitBreaker:
         )
 
     def _emit_alert(self, message: str) -> None:
-        """Fire the optional async alert callback."""
+        """Fire the optional async alert callback.
+
+        The callback is scheduled as a tracked task so that exceptions are
+        logged instead of silently swallowed by the event loop.
+        """
         if self._alert_callback is None:
             return
 
         import asyncio
 
+        def _on_alert_done(task: asyncio.Task) -> None:
+            if task.cancelled():
+                return
+            exc = task.exception()
+            if exc is not None:
+                log.error("Circuit breaker alert delivery failed: %s", exc)
+
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                loop.create_task(self._alert_callback(message))
+                task = loop.create_task(self._alert_callback(message))
+                task.add_done_callback(_on_alert_done)
         except Exception as exc:
             log.warning("Alert callback error (circuit breaker): %s", exc)
 

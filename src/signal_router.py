@@ -560,19 +560,19 @@ class SignalRouter:
             )
         if not delivered:
             retries = signal._delivery_retries
-            if retries < 2:
+            if retries < 4:
                 signal._delivery_retries = retries + 1
                 log.info(
-                    "Re-queuing {} {} (delivery attempt {}/3)",
+                    "Re-queuing {} {} (delivery attempt {}/5)",
                     signal.channel,
                     signal.signal_id,
                     retries + 2,
                 )
-                await _delivery_sleep(2 ** retries)  # 1 s, 2 s for retries 0, 1
+                await _delivery_sleep(2 ** retries)  # 1 s, 2 s, 4 s, 8 s
                 await self._queue.put(signal)
             else:
                 log.error(
-                    "Signal {} {} permanently lost after 3 delivery attempts",
+                    "Signal {} {} permanently lost after 5 delivery attempts",
                     signal.channel,
                     signal.signal_id,
                 )
@@ -584,7 +584,7 @@ class SignalRouter:
                         f"Symbol: {signal.symbol}\n"
                         f"Direction: {signal.direction.value}\n"
                         f"Signal ID: {signal.signal_id}\n"
-                        f"Failed after 3 delivery attempts."
+                        f"Failed after 5 delivery attempts."
                     )
                 except Exception:
                     pass  # Best-effort — don't mask the original failure

@@ -46,21 +46,21 @@ class TelegramBot:
         * **Markdown parse error** (400 + "can't parse entities"): retried once
           as plain text so the user still receives the signal.
         * **Rate limit** (429): waits ``parameters.retry_after`` seconds from
-          the response body, then retries (up to 3 total attempts).
-        * **Server errors** (5xx): exponential back-off (1 s, 2 s, 4 s) with up
-          to 3 total attempts.
-        * **Timeout**: exponential back-off, up to 3 total attempts.
+          the response body, then retries (up to 5 total attempts).
+        * **Server errors** (5xx): exponential back-off (1 s, 2 s, 4 s, 8 s)
+          with up to 5 total attempts.
+        * **Timeout**: exponential back-off, up to 5 total attempts.
         * **Other 4xx**: returned immediately as False (not recoverable).
         """
         if not self._token:
-            log.debug("Telegram token not configured – message not sent")
+            log.warning("Telegram token not configured – message not sent")
             return False
         if parse_mode == "Markdown":
             text = self._sanitize_markdown(text)
         session = await self._ensure_session()
         url = f"{self._base}/sendMessage"
         payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
-        max_attempts = 3
+        max_attempts = 5
         for attempt in range(max_attempts):
             try:
                 async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=10)) as resp:
@@ -134,16 +134,16 @@ class TelegramBot:
 
         Retry behaviour mirrors ``send_message``:
         * **Rate limit** (429): waits ``parameters.retry_after`` seconds, then retries.
-        * **Server errors** (5xx): exponential back-off (1 s, 2 s, 4 s).
-        * **Timeout**: exponential back-off, up to 3 total attempts.
+        * **Server errors** (5xx): exponential back-off (1 s, 2 s, 4 s, 8 s).
+        * **Timeout**: exponential back-off, up to 5 total attempts.
         * **Other 4xx**: returned immediately as False.
         """
         if not self._token:
-            log.debug("Telegram token not configured – photo not sent")
+            log.warning("Telegram token not configured – photo not sent")
             return False
         session = await self._ensure_session()
         url = f"{self._base}/sendPhoto"
-        max_attempts = 3
+        max_attempts = 5
         for attempt in range(max_attempts):
             try:
                 form = aiohttp.FormData()
@@ -668,12 +668,16 @@ class TelegramBot:
                     results = data.get("result", [])
                     if results:
                         self._offset = results[-1]["update_id"] + 1
-                        log.info("Cleared %d stale Telegram updates", len(results))
+                        log.info(
+                            "Cleared %d stale Telegram update(s) — commands sent during boot are skipped",
+                            len(results),
+                        )
         except Exception as exc:
-            log.debug("Failed to clear stale updates: %s", exc)
+            log.warning("Failed to clear stale Telegram updates: %s", exc)
         while self._running:
             try:
                 if not self._token:
+                    log.warning("Telegram token not configured – command polling paused")
                     await asyncio.sleep(30)
                     continue
                 session = await self._ensure_session()
