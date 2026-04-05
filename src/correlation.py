@@ -180,6 +180,38 @@ def compute_btc_correlation(
     }
 
 
+def compute_rolling_btc_correlation(
+    symbol: str,
+    closes_btc: List[float],
+    closes_pair: List[float],
+    window: int = 50,
+) -> float:
+    """Compute the rolling Pearson correlation between *symbol* and BTC.
+
+    Thin wrapper around :func:`rolling_pearson` that adds symbol-level
+    logging for observability.  Returns 0.0 when there is insufficient data.
+
+    Parameters
+    ----------
+    symbol:
+        Symbol being evaluated (e.g. ``"SOLUSDT"``).  Used for log context only.
+    closes_btc:
+        List of BTC close prices (most recent last).
+    closes_pair:
+        List of *symbol* close prices aligned to *closes_btc* (most recent last).
+    window:
+        Rolling window size in candles (default 50).
+
+    Returns
+    -------
+    float
+        Pearson correlation in ``[-1, 1]``, or ``0.0`` on insufficient data.
+    """
+    corr = rolling_pearson(closes_btc, closes_pair, window)
+    log.debug("{} rolling BTC correlation (window={}): {:.3f}", symbol, window, corr)
+    return corr
+
+
 # ---------------------------------------------------------------------------
 # Lead / Lag detection  (Rec 9)
 # ---------------------------------------------------------------------------
