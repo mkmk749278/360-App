@@ -40,6 +40,9 @@ fun DashboardScreen(
     val filter by viewModel.selectedFilter.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
+    val regime by viewModel.regime.collectAsStateWithLifecycle()
+    val pausedPairs by viewModel.pausedPairs.collectAsStateWithLifecycle()
+    var pausedExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -129,6 +132,78 @@ fun DashboardScreen(
                             label = f.name,
                             onClick = { viewModel.setFilter(f) },
                         )
+                    }
+                }
+                // Regime pill banner
+                if (regime.isNotBlank()) {
+                    val (regimeColor, regimeBg) = when {
+                        regime.startsWith("TRENDING") -> Pair(LongGreen, Color(0xFF0A2010))
+                        regime == "RANGING" -> Pair(Color(0xFF4DA6FF), Color(0xFF0A1828))
+                        regime == "VOLATILE" -> Pair(Gold, Color(0xFF2A1800))
+                        else -> Pair(OnSurfaceDim, Color(0xFF151C2A))
+                    }
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(regimeBg)
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Box(
+                            Modifier
+                                .background(regimeColor, RoundedCornerShape(20.dp))
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                        ) {
+                            Text(
+                                regime.replace("_", " "),
+                                color = Color.Black,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                        Text("Market Regime", color = regimeColor.copy(alpha = 0.8f), fontSize = 11.sp)
+                    }
+                }
+                // Paused pairs banner
+                val pausedCount = pausedPairs.count { it.value }
+                AnimatedVisibility(visible = pausedCount > 0) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF2A0010))
+                            .clickable { pausedExpanded = !pausedExpanded },
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("⚠", fontSize = 14.sp)
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "$pausedCount pair${if (pausedCount > 1) "s" else ""} paused by circuit breaker",
+                                color = ShortRed,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                if (pausedExpanded) "▲" else "▼",
+                                color = ShortRed,
+                                fontSize = 10.sp,
+                            )
+                        }
+                        AnimatedVisibility(visible = pausedExpanded) {
+                            Column(Modifier.padding(start = 36.dp, bottom = 8.dp, end = 16.dp)) {
+                                pausedPairs.filter { it.value }.keys.forEach { sym ->
+                                    Text(
+                                        "• $sym",
+                                        color = ShortRed.copy(alpha = 0.8f),
+                                        fontSize = 11.sp,
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -2,6 +2,7 @@ package com.app360.signals.ui.screens
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -165,6 +166,41 @@ fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
                             }
                         }
                     }
+
+                    // Per-Pair Scoreboard
+                    if (s.perPair.isNotEmpty()) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(
+                                    width = 1.dp,
+                                    brush = Brush.linearGradient(listOf(GradientStart, GradientEnd)),
+                                    shape = RoundedCornerShape(16.dp),
+                                ),
+                            colors = CardDefaults.cardColors(containerColor = CardBackground),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                        ) {
+                            Column(Modifier.padding(16.dp)) {
+                                Text(
+                                    "Per-Pair Scoreboard",
+                                    color = OnSurface,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                s.perPair.forEach { pair ->
+                                    PairScoreRow(
+                                        symbol = pair.symbol,
+                                        winRate = pair.winRate,
+                                        avgPnl = pair.avgPnl,
+                                        total = pair.total,
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                }
+                            }
+                        }
+                    }
                 } ?: run {
                     Box(
                         Modifier
@@ -320,4 +356,59 @@ fun StatItem(label: String, value: String, valueColor: Color) {
 @Composable
 fun WinLossBarChart(wins: Int, losses: Int) {
     AnimatedWinLossChart(wins = wins, losses = losses)
+}
+
+@Composable
+fun PairScoreRow(symbol: String, winRate: Double, avgPnl: Double, total: Int) {
+    val winRateColor = when {
+        winRate >= 60.0 -> LongGreen
+        winRate >= 45.0 -> Gold
+        else -> ShortRed
+    }
+    val animatedWinRate by animateFloatAsState(
+        targetValue = (winRate / 100f).toFloat().coerceIn(0f, 1f),
+        animationSpec = tween(800, easing = FastOutSlowInEasing),
+        label = "winrate_$symbol",
+    )
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            symbol.removeSuffix("USDT"),
+            color = OnBackground,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.width(52.dp),
+        )
+        Box(
+            Modifier
+                .weight(1f)
+                .height(6.dp)
+                .background(Surface, RoundedCornerShape(3.dp)),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(animatedWinRate)
+                    .background(winRateColor, RoundedCornerShape(3.dp)),
+            )
+        }
+        Text(
+            "${winRate.toInt()}%",
+            color = winRateColor,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.width(36.dp),
+        )
+        Text(
+            "${if (avgPnl >= 0) "+" else ""}${"%.1f".format(avgPnl)}%",
+            color = if (avgPnl >= 0) LongGreen else ShortRed,
+            fontSize = 10.sp,
+            modifier = Modifier.width(44.dp),
+        )
+    }
 }

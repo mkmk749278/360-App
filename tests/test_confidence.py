@@ -607,3 +607,42 @@ class TestScoreTrendWithMACD:
         """Old 5-arg call (no MACD) still works identically."""
         s_old = score_trend(True, True, True, adx_value=40.0, momentum_strength=1.0)
         assert s_old == pytest.approx(25.0)  # capped at max
+
+
+class TestComputeTransitionBoost:
+    """Tests for the regime transition confidence boost (Rec 3)."""
+
+    def test_boost_for_trending_up_at_age_zero(self):
+        from src.confidence import compute_transition_boost
+        assert compute_transition_boost("RANGING→TRENDING_UP", 0) == pytest.approx(7.0)
+
+    def test_boost_for_trending_down_at_age_five(self):
+        from src.confidence import compute_transition_boost
+        assert compute_transition_boost("QUIET→TRENDING_DOWN", 5) == pytest.approx(7.0)
+
+    def test_no_boost_at_age_six(self):
+        from src.confidence import compute_transition_boost
+        assert compute_transition_boost("RANGING→TRENDING_UP", 6) == pytest.approx(0.0)
+
+    def test_no_boost_for_non_trending_transition(self):
+        from src.confidence import compute_transition_boost
+        assert compute_transition_boost("QUIET→VOLATILE", 0) == pytest.approx(0.0)
+
+    def test_no_boost_for_empty_transition_type(self):
+        from src.confidence import compute_transition_boost
+        assert compute_transition_boost("", 0) == pytest.approx(0.0)
+
+    def test_no_boost_for_negative_age(self):
+        from src.confidence import compute_transition_boost
+        assert compute_transition_boost("RANGING→TRENDING_UP", -1) == pytest.approx(0.0)
+
+    def test_adaptive_threshold_lowered_by_transition_boost(self):
+        from src.confidence import compute_adaptive_threshold
+        without_boost = compute_adaptive_threshold(base_threshold=65.0, regime="TRENDING")
+        with_boost = compute_adaptive_threshold(
+            base_threshold=65.0,
+            regime="TRENDING",
+            transition_type="RANGING→TRENDING_UP",
+            transition_age_candles=0,
+        )
+        assert with_boost == pytest.approx(without_boost - 7.0)

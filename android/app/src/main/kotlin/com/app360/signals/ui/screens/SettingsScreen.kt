@@ -3,9 +3,12 @@ package com.app360.signals.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -64,6 +67,7 @@ fun SettingsScreen(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -247,6 +251,12 @@ fun SettingsScreen(
                 }
             }
 
+            // Signal Limits card
+            SignalLimitsCard()
+
+            // Push Notifications card
+            PushNotificationsCard()
+
             // App info card
             Card(
                 modifier = Modifier
@@ -310,6 +320,145 @@ fun SettingsScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+data class SignalLimitConfig(val key: String, val label: String, val min: Int, val max: Int)
+
+@Composable
+fun SignalLimitsCard() {
+    val limits = remember {
+        listOf(
+            SignalLimitConfig("MAX_SCALP_SIGNALS", "Scalp", 1, 10),
+            SignalLimitConfig("MAX_SCALP_FVG_SIGNALS", "FVG", 1, 5),
+            SignalLimitConfig("MAX_SCALP_CVD_SIGNALS", "CVD", 1, 5),
+            SignalLimitConfig("MAX_SCALP_VWAP_SIGNALS", "VWAP", 1, 5),
+            SignalLimitConfig("MAX_SCALP_OBI_SIGNALS", "OBI", 1, 5),
+        )
+    }
+    val values = remember { limits.associate { it.key to it.min + 1 }.toMutableStateMap() }
+    val defaults = mapOf(
+        "MAX_SCALP_SIGNALS" to 5,
+        "MAX_SCALP_FVG_SIGNALS" to 3,
+        "MAX_SCALP_CVD_SIGNALS" to 3,
+        "MAX_SCALP_VWAP_SIGNALS" to 3,
+        "MAX_SCALP_OBI_SIGNALS" to 3,
+    )
+    // Initialize with defaults
+    LaunchedEffect(Unit) {
+        defaults.forEach { (k, v) -> values[k] = v }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(listOf(GradientStart, GradientEnd)),
+                shape = RoundedCornerShape(16.dp),
+            ),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                "Signal Limits",
+                color = OnSurface,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(8.dp))
+            limits.forEach { cfg ->
+                val v = values[cfg.key] ?: cfg.min
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        cfg.label,
+                        color = OnSurfaceDim,
+                        fontSize = 11.sp,
+                        modifier = Modifier.width(44.dp),
+                    )
+                    Slider(
+                        value = v.toFloat(),
+                        onValueChange = { values[cfg.key] = it.toInt() },
+                        valueRange = cfg.min.toFloat()..cfg.max.toFloat(),
+                        steps = cfg.max - cfg.min - 1,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Teal,
+                            activeTrackColor = Teal,
+                            inactiveTrackColor = DividerColor,
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Box(
+                        Modifier
+                            .background(TealDim, RoundedCornerShape(20.dp))
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    ) {
+                        Text("$v", color = Teal, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PushNotificationsCard() {
+    var pushEnabled by remember { mutableStateOf(true) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(listOf(GradientStart, GradientEnd)),
+                shape = RoundedCornerShape(16.dp),
+            ),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Rounded.Notifications,
+                contentDescription = null,
+                tint = Teal,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Push Notifications",
+                    color = OnSurface,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "Receive alerts for new signals",
+                    color = OnSurfaceDim,
+                    fontSize = 11.sp,
+                )
+            }
+            Switch(
+                checked = pushEnabled,
+                onCheckedChange = { pushEnabled = it },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.Black,
+                    checkedTrackColor = Teal,
+                    uncheckedThumbColor = OnSurfaceDim,
+                    uncheckedTrackColor = Surface,
+                ),
+            )
         }
     }
 }

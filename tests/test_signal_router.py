@@ -1109,3 +1109,24 @@ class TestPublishDailyRecap:
         }
         await r.publish_daily_recap(mock_tracker)
         assert sent_messages == []
+
+
+class TestDeadLetterSignals:
+    """Tests for the dead-letter list on SignalRouter."""
+
+    def _make_router(self):
+        queue = MagicMock()
+        async def _send(chat_id, text): return True
+        return SignalRouter(queue=queue, send_telegram=_send, format_signal=lambda s: "")
+
+    def test_dead_letter_initially_empty(self):
+        r = self._make_router()
+        assert r.dead_letter_signals == []
+
+    def test_dead_letter_returns_defensive_copy(self):
+        r = self._make_router()
+        copy1 = r.dead_letter_signals
+        copy2 = r.dead_letter_signals
+        # They are equal but distinct list objects
+        assert copy1 == copy2
+        assert copy1 is not copy2
