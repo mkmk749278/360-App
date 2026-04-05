@@ -8,6 +8,8 @@ on:
 jobs:
   check-secrets:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       has_ssh_key: ${{ steps.check.outputs.has_ssh_key }}
     steps:
@@ -25,6 +27,8 @@ jobs:
     needs: check-secrets
     if: needs.check-secrets.outputs.has_ssh_key == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -117,7 +121,7 @@ ENVEOF
 
             # Wait and verify health with retries
             echo "Waiting for services to start..."
-            MAX_RETRIES=12
+            MAX_RETRIES=12  # 12 × 10s = 120s total wait
             RETRY_INTERVAL=10
             for i in $(seq 1 $MAX_RETRIES); do
               sleep $RETRY_INTERVAL

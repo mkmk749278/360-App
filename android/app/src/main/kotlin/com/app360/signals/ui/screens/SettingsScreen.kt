@@ -232,7 +232,7 @@ fun SettingsScreen(
                         onValueChange = { confidenceThreshold = it.toInt() },
                         onValueChangeFinished = { onMinConfidenceSaved(confidenceThreshold) },
                         valueRange = 0f..100f,
-                        steps = 19,
+                        steps = 19, // 5% increments: (100 / 5) - 1 = 19 steps
                         colors = SliderDefaults.colors(
                             thumbColor = Teal,
                             activeTrackColor = Teal,

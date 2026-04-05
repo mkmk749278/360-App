@@ -16,11 +16,16 @@ class ApiClientHolder @Inject constructor(
 ) {
     @Volatile private var currentBaseUrl: String = DEFAULT_BACKEND_URL
     @Volatile private var apiService: ApiService = buildService(currentBaseUrl)
+    private val lock = Any()
 
     fun getApiService(baseUrl: String): ApiService {
         if (baseUrl != currentBaseUrl) {
-            currentBaseUrl = baseUrl
-            apiService = buildService(baseUrl)
+            synchronized(lock) {
+                if (baseUrl != currentBaseUrl) {
+                    currentBaseUrl = baseUrl
+                    apiService = buildService(baseUrl)
+                }
+            }
         }
         return apiService
     }
