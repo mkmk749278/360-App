@@ -30,6 +30,7 @@ import com.app360.signals.viewmodel.StatsViewModel
 fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
     val stats by viewModel.stats.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val circuitBreakerState by viewModel.circuitBreakerState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -60,6 +61,37 @@ fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // Circuit Breaker status banner
+                val isTripped = circuitBreakerState == "TRIPPED"
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.dp,
+                            color = if (isTripped) ShortRed else LongGreen,
+                            shape = RoundedCornerShape(12.dp),
+                        ),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isTripped) ShortRedBg else LongGreenBg,
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(if (isTripped) "🔴" else "🟢", fontSize = 16.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (isTripped) "Circuit Breaker: TRIPPED — Signals paused"
+                            else "Circuit Breaker: OK — Engine active",
+                            color = if (isTripped) ShortRed else LongGreen,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
                 stats?.let { s ->
                     // 2×2 metric grid
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

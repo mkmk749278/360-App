@@ -4,7 +4,10 @@ import com.app360.signals.data.models.HealthResponse
 import com.app360.signals.data.models.Signal
 import com.app360.signals.data.models.Stats
 import com.app360.signals.data.models.StatusResponse
+import retrofit2.Response
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Query
 
 interface ApiService {
@@ -22,4 +25,7 @@ interface ApiService {
 
     @GET("status")
     suspend fun getStatus(): StatusResponse
+
+    @POST("fcm/register")
+    suspend fun registerFcmToken(@Body body: Map<String, String>): Response<Unit>
 }

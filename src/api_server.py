@@ -6,6 +6,7 @@ Exposes:
   GET  /signals/history  → last N completed signals
   GET  /stats            → today's win/loss/winrate/avg_pnl
   GET  /status           → engine status
+  POST /fcm/register     → register FCM push token
   WS   /ws/signals       → real-time signal push feed
 """
 
@@ -57,6 +58,15 @@ def _signal_to_dict(sig: Any) -> Dict[str, Any]:
     # Ensure required API fields are present with fallback defaults
     d.setdefault("id", d.get("signal_id", ""))
     d.setdefault("timestamp", datetime.now(timezone.utc).isoformat())
+    # Compute rr_ratio server-side for accuracy
+    try:
+        entry = float(d.get("entry", 0) or 0)
+        stop_loss = float(d.get("stop_loss", 0) or 0)
+        tp1 = float(d.get("tp1", 0) or 0)
+        risk = abs(entry - stop_loss)
+        d["rr_ratio"] = round(abs(tp1 - entry) / risk, 2) if risk > 0 else 0.0
+    except Exception:
+        d.setdefault("rr_ratio", 0.0)
     return d
 
 
@@ -139,6 +149,8 @@ async def get_stats() -> Dict[str, Any]:
         return {"wins": 0, "losses": 0, "win_rate": 0.0, "avg_pnl": 0.0, "total": 0}
     try:
         tracker = _engine_ref._performance_tracker
+        if tracker is None:
+            return {"wins": 0, "losses": 0, "win_rate": 0.0, "avg_pnl": 0.0, "total": 0}
         summary = tracker.get_daily_summary(window_days=1)
         return {
             "wins": summary.get("wins", 0),
@@ -175,6 +187,7 @@ async def get_status() -> Dict[str, Any]:
             "pairs_count": len(getattr(pair_mgr, "symbols", [])),
             "scan_interval": SCAN_INTERVAL_SECONDS,
             "circuit_breaker_tripped": cb.is_tripped(),
+            "circuit_breaker_state": "TRIPPED" if cb.is_tripped() else "OK",
             "circuit_breaker_status": cb.status_text(),
             "regime": str(regime),
             "active_signals_count": len(_engine_ref.router.active_signals),
@@ -182,6 +195,22 @@ async def get_status() -> Dict[str, Any]:
     except Exception as exc:
         log.error("Error fetching status: {}", exc)
         return {"engine": "error", "detail": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# FCM Token Registration
+# ---------------------------------------------------------------------------
+
+_fcm_tokens: set = set()
+
+
+@app.post("/fcm/register")
+async def register_fcm_token(payload: Dict[str, Any]) -> Dict[str, str]:
+    token = payload.get("token", "")
+    if token:
+        _fcm_tokens.add(token)
+        log.info("FCM token registered (total: {})", len(_fcm_tokens))
+    return {"status": "ok"}
 
 
 # ---------------------------------------------------------------------------

@@ -3,10 +3,13 @@ package com.app360.signals.ui.theme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 
 val BACKEND_URL_KEY = stringPreferencesKey("backend_url")
+val MIN_CONFIDENCE_KEY = intPreferencesKey("min_confidence")
 const val DEFAULT_BACKEND_URL = "http://95.111.241.97:8080"
+const val DEFAULT_MIN_CONFIDENCE = 60
 
 private val DarkColorScheme = darkColorScheme(
     primary = Teal,

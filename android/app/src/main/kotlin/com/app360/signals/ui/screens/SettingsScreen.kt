@@ -23,13 +23,16 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     currentUrl: String,
+    minConfidence: Int = 60,
     appVersion: String = "1.0",
     onUrlSaved: (String) -> Unit,
     onTestConnection: suspend (String) -> Boolean,
+    onMinConfidenceSaved: (Int) -> Unit = {},
 ) {
     var urlInput by remember(currentUrl) { mutableStateOf(currentUrl) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var isTesting by remember { mutableStateOf(false) }
+    var confidenceThreshold by remember(minConfidence) { mutableIntStateOf(minConfidence) }
     val scope = rememberCoroutineScope()
 
     Scaffold(
@@ -182,6 +185,65 @@ fun SettingsScreen(
                             )
                         }
                     }
+                }
+            }
+
+            // Confidence threshold card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(listOf(GradientStart, GradientEnd)),
+                        shape = RoundedCornerShape(16.dp),
+                    ),
+                colors = CardDefaults.cardColors(containerColor = CardBackground),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Min Confidence",
+                            color = OnSurface,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Box(
+                            Modifier
+                                .background(TealDim, RoundedCornerShape(20.dp))
+                                .padding(horizontal = 10.dp, vertical = 3.dp),
+                        ) {
+                            Text(
+                                "$confidenceThreshold%",
+                                color = Teal,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Slider(
+                        value = confidenceThreshold.toFloat(),
+                        onValueChange = { confidenceThreshold = it.toInt() },
+                        onValueChangeFinished = { onMinConfidenceSaved(confidenceThreshold) },
+                        valueRange = 0f..100f,
+                        steps = 19,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Teal,
+                            activeTrackColor = Teal,
+                            inactiveTrackColor = DividerColor,
+                        ),
+                    )
+                    Text(
+                        "Only show signals with confidence ≥ $confidenceThreshold%",
+                        color = OnSurfaceDim,
+                        fontSize = 11.sp,
+                    )
                 }
             }
 
