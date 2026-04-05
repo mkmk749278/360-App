@@ -337,17 +337,14 @@ fun SignalLimitsCard() {
             SignalLimitConfig("MAX_SCALP_OBI_SIGNALS", "OBI", 1, 5),
         )
     }
-    val values = remember { limits.associate { it.key to it.min + 1 }.toMutableStateMap() }
-    val defaults = mapOf(
-        "MAX_SCALP_SIGNALS" to 5,
-        "MAX_SCALP_FVG_SIGNALS" to 3,
-        "MAX_SCALP_CVD_SIGNALS" to 3,
-        "MAX_SCALP_VWAP_SIGNALS" to 3,
-        "MAX_SCALP_OBI_SIGNALS" to 3,
-    )
-    // Initialize with defaults
-    LaunchedEffect(Unit) {
-        defaults.forEach { (k, v) -> values[k] = v }
+    val values = remember {
+        mutableStateMapOf(
+            "MAX_SCALP_SIGNALS" to 5,
+            "MAX_SCALP_FVG_SIGNALS" to 3,
+            "MAX_SCALP_CVD_SIGNALS" to 3,
+            "MAX_SCALP_VWAP_SIGNALS" to 3,
+            "MAX_SCALP_OBI_SIGNALS" to 3,
+        )
     }
 
     Card(

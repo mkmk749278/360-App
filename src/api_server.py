@@ -162,14 +162,16 @@ async def get_stats() -> Dict[str, Any]:
         per_pair: List[Dict[str, Any]] = []
         try:
             scoreboard = tracker.get_pair_scoreboard(window_days=7)
-            for sym, data in scoreboard.items():
-                per_pair.append({
+            raw = [
+                {
                     "symbol": sym,
                     "win_rate": data.get("win_rate", 0.0),
                     "avg_pnl": data.get("avg_pnl", 0.0),
                     "total": data.get("count", 0),
-                })
-            per_pair.sort(key=lambda x: x["win_rate"], reverse=True)
+                }
+                for sym, data in scoreboard.items()
+            ]
+            per_pair = sorted(raw, key=lambda x: x["win_rate"], reverse=True)
         except Exception:
             pass
         return {

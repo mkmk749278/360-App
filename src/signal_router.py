@@ -585,7 +585,7 @@ class SignalRouter:
                     "signal_id": signal.signal_id,
                     "symbol": signal.symbol,
                     "channel": signal.channel,
-                    "direction": signal.direction.value if hasattr(signal.direction, "value") else str(signal.direction),
+                    "direction": str(signal.direction.value) if isinstance(signal.direction, Direction) else str(signal.direction),
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "error": "Failed after 5 delivery attempts",
                 })
