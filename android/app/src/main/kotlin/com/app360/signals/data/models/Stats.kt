@@ -4,12 +4,21 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class PairStats(
+    val symbol: String = "",
+    @SerialName("win_rate") val winRate: Double = 0.0,
+    @SerialName("avg_pnl") val avgPnl: Double = 0.0,
+    val total: Int = 0,
+)
+
+@Serializable
 data class Stats(
     val wins: Int = 0,
     val losses: Int = 0,
     @SerialName("win_rate") val winRate: Double = 0.0,
     @SerialName("avg_pnl") val avgPnl: Double = 0.0,
     val total: Int = 0,
+    @SerialName("per_pair") val perPair: List<PairStats> = emptyList(),
 )
 
 @Serializable
@@ -28,4 +37,5 @@ data class StatusResponse(
     @SerialName("circuit_breaker_status") val circuitBreakerStatus: String = "",
     val regime: String = "",
     @SerialName("active_signals_count") val activeSignalsCount: Int = 0,
+    @SerialName("per_pair_breaker") val perPairBreaker: Map<String, Boolean> = emptyMap(),
 )

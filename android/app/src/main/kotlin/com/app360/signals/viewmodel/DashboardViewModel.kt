@@ -10,7 +10,9 @@ import com.app360.signals.data.repository.SignalRepository
 import com.app360.signals.ui.theme.DEFAULT_MIN_CONFIDENCE
 import com.app360.signals.ui.theme.MIN_CONFIDENCE_KEY
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -29,6 +31,12 @@ class DashboardViewModel @Inject constructor(
     val isRefreshing: StateFlow<Boolean> = _isRefreshing
 
     val connectionState: StateFlow<ConnectionState> = repository.connectionState
+
+    private val _regime = MutableStateFlow("")
+    val regime: StateFlow<String> = _regime
+
+    private val _pausedPairs = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val pausedPairs: StateFlow<Map<String, Boolean>> = _pausedPairs
 
     private val minConfidence: StateFlow<Int> = dataStore.data
         .map { prefs -> prefs[MIN_CONFIDENCE_KEY] ?: DEFAULT_MIN_CONFIDENCE }
@@ -51,6 +59,25 @@ class DashboardViewModel @Inject constructor(
             FilterOption.OBI -> filtered.filter { it.channel.contains("OBI", ignoreCase = true) }
         }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    init {
+        startStatusPolling()
+    }
+
+    private fun startStatusPolling() {
+        viewModelScope.launch {
+            while (isActive) {
+                try {
+                    val status = repository.fetchStatus()
+                    if (status != null) {
+                        _regime.value = status.regime
+                        _pausedPairs.value = status.perPairBreaker
+                    }
+                } catch (_: Exception) { /* keep previous values */ }
+                delay(30_000L)
+            }
+        }
+    }
 
     fun setFilter(filter: FilterOption) { _selectedFilter.value = filter }
 

@@ -721,6 +721,55 @@ _REGIME_THRESHOLD_OFFSETS: Dict[str, float] = {
     "QUIET": 0.0,         # Neutral
 }
 
+# ---------------------------------------------------------------------------
+# Regime transition confidence boost  (Rec 3)
+# ---------------------------------------------------------------------------
+# Magnitude of the confidence boost applied when the market has just
+# transitioned into a trending regime.
+_TRANSITION_BOOST: float = 7.0
+# Number of candles *after* the confirmed transition during which the boost
+# is applied (age 0 = the candle on which the transition was confirmed).
+_MAX_TRANSITION_AGE_CANDLES: int = 5
+# Transition type suffixes that qualify for the boost.
+_TRENDING_SUFFIXES: tuple = ("TRENDING_UP", "TRENDING_DOWN")
+
+
+def compute_transition_boost(
+    transition_type: str,
+    transition_age_candles: int,
+) -> float:
+    """Return a confidence boost for fresh regime transitions into trending.
+
+    A boost of :data:`_TRANSITION_BOOST` (+7) is returned when:
+
+    * The transition type ends with ``"TRENDING_UP"`` or ``"TRENDING_DOWN"``,
+      indicating the market has just entered a directional regime.
+    * The transition is *fresh* — ``transition_age_candles`` is between 0 and
+      :data:`_MAX_TRANSITION_AGE_CANDLES` (0–5, inclusive).
+
+    Parameters
+    ----------
+    transition_type:
+        String like ``"RANGING→TRENDING_UP"`` (as produced by
+        :meth:`~src.regime.MarketRegimeDetector.build_regime_context`).
+        Empty string → no boost.
+    transition_age_candles:
+        How many candles have elapsed since the transition was confirmed.
+        Negative values → no boost.
+
+    Returns
+    -------
+    float
+        ``+7.0`` when conditions are met, ``0.0`` otherwise.
+    """
+    if not transition_type:
+        return 0.0
+    if not (0 <= transition_age_candles <= _MAX_TRANSITION_AGE_CANDLES):
+        return 0.0
+    if any(transition_type.endswith(s) for s in _TRENDING_SUFFIXES):
+        return _TRANSITION_BOOST
+    return 0.0
+
 
 def compute_adaptive_threshold(
     base_threshold: float = 65.0,
@@ -729,6 +778,8 @@ def compute_adaptive_threshold(
     channel: Optional[str] = None,
     symbol: Optional[str] = None,
     pair_tier: Optional[str] = None,
+    transition_type: str = "",
+    transition_age_candles: int = -1,
 ) -> float:
     """Compute an adaptive minimum confidence threshold.
 
@@ -740,6 +791,8 @@ def compute_adaptive_threshold(
       adds an extra buffer.
     * **Per-pair regime offsets** — symbol-specific or tier-specific adjustments
       from ``PAIR_REGIME_OFFSETS`` (Rec 4).
+    * **Regime transition boost** — fresh transitions into trending regimes
+      lower the threshold by :data:`_TRANSITION_BOOST` (Rec 3).
 
     Parameters
     ----------
@@ -758,6 +811,12 @@ def compute_adaptive_threshold(
     pair_tier:
         Optional pair tier (``"MAJOR"``/``"MIDCAP"``/``"ALTCOIN"``).  Used
         as a fallback when no symbol-specific offsets exist.
+    transition_type:
+        Regime transition type string (e.g. ``"RANGING→TRENDING_UP"``).
+        Passed to :func:`compute_transition_boost`.
+    transition_age_candles:
+        Age of the current regime transition in candles.  Passed to
+        :func:`compute_transition_boost`.  Negative → no boost.
 
     Returns
     -------
@@ -784,6 +843,9 @@ def compute_adaptive_threshold(
     if not resolved:
         regime_offset = _REGIME_THRESHOLD_OFFSETS.get(regime, 0.0)
     threshold += regime_offset
+
+    # Regime transition boost (Rec 3): fresh transitions into trending lower the bar
+    threshold -= compute_transition_boost(transition_type, transition_age_candles)
 
     # Extreme volatility buffer
     if volatility_percentile > 0.9:

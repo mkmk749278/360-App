@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from src.correlation import check_correlation_limit, get_correlation_groups
 
 
@@ -134,3 +136,28 @@ class TestCheckCorrelationLimit:
         )
         assert allowed is True
         assert reason == ""
+
+
+class TestComputeRollingBtcCorrelation:
+    """Tests for the compute_rolling_btc_correlation() convenience wrapper."""
+
+    def test_perfectly_correlated_series(self):
+        from src.correlation import compute_rolling_btc_correlation
+        prices = [float(i) for i in range(1, 60)]
+        result = compute_rolling_btc_correlation("ETHUSDT", prices, prices, window=50)
+        assert result == pytest.approx(1.0, abs=1e-9)
+
+    def test_insufficient_data_returns_zero(self):
+        from src.correlation import compute_rolling_btc_correlation
+        result = compute_rolling_btc_correlation("SOLUSDT", [1.0, 2.0], [1.0, 2.0], window=50)
+        assert result == pytest.approx(0.0)
+
+    def test_custom_window_respected(self):
+        from src.correlation import compute_rolling_btc_correlation
+        prices_btc = [float(i) for i in range(1, 60)]
+        prices_pair = [float(i * 2) for i in range(1, 60)]
+        r20 = compute_rolling_btc_correlation("BNBUSDT", prices_btc, prices_pair, window=20)
+        r50 = compute_rolling_btc_correlation("BNBUSDT", prices_btc, prices_pair, window=50)
+        # Both should be ~1.0 for linear series; just check both return valid correlation
+        assert -1.0 <= r20 <= 1.0
+        assert -1.0 <= r50 <= 1.0

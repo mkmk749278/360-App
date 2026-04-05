@@ -28,4 +28,7 @@ interface ApiService {
 
     @POST("fcm/register")
     suspend fun registerFcmToken(@Body body: Map<String, String>): Response<Unit>
+
+    @POST("settings/signal_limits")
+    suspend fun updateSignalLimits(@Body limits: Map<String, Int>): Response<Unit>
 }

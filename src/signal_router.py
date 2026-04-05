@@ -13,6 +13,7 @@ The router:
 from __future__ import annotations
 
 import asyncio
+import collections
 import dataclasses
 import inspect
 import json
@@ -136,6 +137,9 @@ class SignalRouter:
         self._ai_scorer: Optional[AIConfidenceScorer] = None
         # WebSocket broadcast queues — API server subscribes to these
         self._ws_broadcast_queues: List[asyncio.Queue] = []
+        # Dead-letter queue — signals that failed all 5 delivery attempts
+        # Bounded to 100 entries; oldest are evicted automatically.
+        self._dead_letter: collections.deque = collections.deque(maxlen=100)
 
     # ------------------------------------------------------------------
     # AI Engine wiring
@@ -576,6 +580,15 @@ class SignalRouter:
                     signal.channel,
                     signal.signal_id,
                 )
+                # Capture in dead-letter list for admin review
+                self._dead_letter.append({
+                    "signal_id": signal.signal_id,
+                    "symbol": signal.symbol,
+                    "channel": signal.channel,
+                    "direction": str(signal.direction.value) if isinstance(signal.direction, Direction) else str(signal.direction),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "error": "Failed after 5 delivery attempts",
+                })
                 # Notify admin about the lost signal (FINDING-023)
                 try:
                     await self._telegram.send_admin_alert(
@@ -917,6 +930,15 @@ class SignalRouter:
     @property
     def active_signals(self) -> Dict[str, Signal]:
         return dict(self._active_signals)
+
+    @property
+    def dead_letter_signals(self) -> List[Dict[str, Any]]:
+        """Return a snapshot of the dead-letter list.
+
+        Returns a copy of signals that exhausted all delivery retries, most
+        recent first.  The list is bounded to 100 entries.
+        """
+        return list(reversed(list(self._dead_letter)))
 
     # ------------------------------------------------------------------
     # WebSocket broadcast helpers (used by API server)

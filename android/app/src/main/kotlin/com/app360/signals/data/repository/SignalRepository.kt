@@ -47,6 +47,15 @@ class SignalRepository @Inject constructor(
 
     fun disconnectWebSocket() = wsClient.disconnect()
 
+    suspend fun fetchHistory(limit: Int = 50): List<Signal> =
+        try { apiClientHolder.getApiService().getSignalHistory(limit) } catch (e: Exception) { emptyList() }
+
+    suspend fun updateSignalLimits(limits: Map<String, Int>): Boolean =
+        try {
+            apiClientHolder.getApiService().updateSignalLimits(limits)
+            true
+        } catch (e: Exception) { false }
+
     suspend fun refreshSignals(): List<Signal> {
         val serverSignals = fetchActiveSignals()
         wsClient.updateSignals(serverSignals)

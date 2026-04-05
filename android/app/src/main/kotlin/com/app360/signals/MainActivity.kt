@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.*
@@ -45,6 +46,7 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 sealed class Screen(val route: String) {
     object Dashboard : Screen("dashboard")
     object Stats : Screen("stats")
+    object History : Screen("history")
     object Settings : Screen("settings")
     object SignalDetail : Screen("signal_detail/{signalId}") {
         fun createRoute(id: String) = "signal_detail/$id"
@@ -93,6 +95,7 @@ fun App() {
 
     val bottomNavItems = listOf(
         Triple("Signals", Screen.Dashboard.route, Icons.Rounded.Wifi),
+        Triple("History", Screen.History.route, Icons.Rounded.History),
         Triple("Stats", Screen.Stats.route, Icons.Rounded.BarChart),
         Triple("Settings", Screen.Settings.route, Icons.Rounded.Settings),
     )
@@ -131,6 +134,9 @@ fun App() {
             }
             composable(Screen.Stats.route) {
                 StatsScreen()
+            }
+            composable(Screen.History.route) {
+                HistoryScreen()
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(
